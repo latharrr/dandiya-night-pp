@@ -38,11 +38,16 @@ const C = {
   MAX_PHOTOS: 5,        // keep equal to CONFIG.MAX_PHOTOS in the page
   BOARD_SIZE: 20,       // top N per board (Garba Queen / Garba King); keep equal to CONFIG.BOARD_SIZE
   PREVIEW_MAX: 5,       // guests peek at no more than this many people per request (the page also caps them at 5 in total)
+  SAMPLE_PROFILES: ENV.SAMPLE_PROFILES !== '0', // fill the guest peek with labelled sample people (samples.json) while there are fewer than 5 real ones
+  SHOW_COUNTS: ENV.SHOW_COUNTS !== '0',         // the page shows "184 girls from North Campus are going"; 0 = never send counts
+  COUNT_MIN: +(ENV.COUNT_MIN || 20),            // below this many people the count is not sent (the page shows the line without a number)
 };
 // Women-only colleges: never accepted for a guy's account (the page doesn't offer them either)
 const WOMEN_ONLY_COLLEGES = ['daulat ram college', 'daulat ram', 'indraprastha college for women', 'miranda house'];
 if (PROD && !C.ADMIN_KEY) { console.error('Set ADMIN_KEY in production.'); process.exit(1); }
 const NIGHTS = ['d1','d2','d3','d4','d5','d6','d7','d8','d9'];
+// Navratri 2026 (keep equal to CONFIG.NIGHTS in the page). Used to keep sample people on nights that haven't passed.
+const NIGHT_DATES = NIGHTS.map((id, i) => [id, `2026-10-${String(11 + i).padStart(2, '0')}`]);
 const ENUMS = {
   gender: ['female','male'], lookingFor: ['one','every'], skill: ['learning','hold','main'], style: ['garba','dandiya','both'],
   sticks: ['have','spare','need'], outfit: ['night','own','match'], knuckle: ['tap','click','breaker'], ride: ['own','cab','metro','need'],
@@ -78,6 +83,10 @@ for (const col of ['req_by TEXT', 'req_opener TEXT', 'req_at INTEGER']) { try { 
 for (const col of ['identity_conflict TEXT', 'picapool_synced_at INTEGER']) { try { db.exec(`ALTER TABLE users ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
 db.exec(`CREATE TABLE IF NOT EXISTS dismissed(from_id TEXT, to_id TEXT, at INTEGER, PRIMARY KEY(from_id, to_id))`);
 const q = sql => db.prepare(sql);
+/* A card is visible to others when it isn't hidden by an admin, has at least one photo and isn't paused by its owner.
+   v2: a card can exist without a photo (the photo is asked for after the first swipe); until then nobody sees it. */
+const VISIBLE = a => `${a}.hidden=0 AND json_array_length(${a}.data,'$.photos')>0 AND COALESCE(json_extract(${a}.data,'$.paused'),0)=0`;
+const visibleCard = p => !!p && (p.photos || []).length > 0 && !p.paused;
 const tx = fn => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
 
 /* ---------------- helpers ---------------- */
@@ -148,7 +157,7 @@ route('GET', '/api/health', () => ({ok: true, day: istDay()}));
 
 route('GET', '/api/stats', () => {
   if (statsCache && now() - statsCache.at < C.STATS_REFRESH_MS) return statsCache.body;
-  const rows = q(`SELECT u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE p.hidden=0`).all();
+  const rows = q(`SELECT u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')}`).all();
   const byNight = {}, cc = {};
   for (const r of rows) { const d = JSON.parse(r.data); for (const n of d.nights) byNight[n] = (byNight[n] || 0) + 1; cc[r.college] = (cc[r.college] || 0) + 1; }
   const topColleges = Object.entries(cc).filter(([n]) => n && n !== 'Not in college' && n !== 'Other DU college').sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, count]) => ({name, count}));
@@ -159,21 +168,33 @@ route('GET', '/api/stats', () => {
 
 /* Guests peek before signing up: the day's top PREVIEW_MAX people of the other side, in Garba Queen/King order
    (tonight's board first, then the all-Navratri board, then everyone else in a daily shuffle).
-   Only first name, college, nights, line and a tiny thumbnail. Never real photos, phones or hidden people. */
+   First name, college, nights, line and the main photo. Never phones, venues or hidden, paused or photo-less people.
+   While there are fewer than PREVIEW_MAX real people, labelled sample people (samples.json) fill the gap: real people always come first.
+   `count` is how many real people of that side (on those nights, if given) have a visible card; null below COUNT_MIN or with SHOW_COUNTS=0. */
 let previewCache = {};
+const SAMPLES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'samples.json'), 'utf8')); } catch (e) { return {female: [], male: []}; } })();
 route('GET', '/api/preview', ({url}) => {
   const gender = url.searchParams.get('gender') === 'male' ? 'male' : 'female';
   const nights = String(url.searchParams.get('nights') || '').split(',').filter(n => NIGHTS.includes(n)).slice(0, 9);
   const key = gender + ':' + nights.sort().join(',') + ':' + istDay();
   const c = previewCache[key]; if (c && now() - c.at < 120e3) return c.body;
-  const rows = q(`SELECT u.id, u.first_name, u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE p.hidden=0 AND u.adult=1 AND u.gender=?`).all(gender);
+  const rows = q(`SELECT u.id, u.first_name, u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1 AND u.gender=?`).all(gender);
   const eligible = rows.map(r => ({r, p: JSON.parse(r.data)})).filter(({p}) => !nights.length || p.nights.some(n => nights.includes(n)));
   const order = [...rankBoard(gender, 'tonight'), ...rankBoard(gender, 'week')].map(x => x.id);
   const pos = id => { const i = order.indexOf(id); return i < 0 ? Infinity : i; };
   const rest = shuffle(eligible.filter(({r}) => pos(r.id) === Infinity), key);
   let list = [...eligible.filter(({r}) => pos(r.id) < Infinity).sort((a, b) => pos(a.r.id) - pos(b.r.id)), ...rest];
-  list = list.slice(0, C.PREVIEW_MAX).map(({r, p}) => ({id: r.id, name: r.first_name, college: r.college, nights: p.nights, prompt: p.prompt || null, thumb: p.thumb || null}));
-  const body = {profiles: list};
+  list = list.slice(0, C.PREVIEW_MAX).map(({r, p}) => ({id: r.id, name: r.first_name, college: r.college, nights: p.nights, prompt: p.prompt || null, photo: p.photos[0]}));
+  if (C.SAMPLE_PROFILES && list.length < C.PREVIEW_MAX) {
+    const today = istDay(), upcoming = NIGHT_DATES.filter(([, d]) => d >= today).map(([id]) => id);
+    const fill = (SAMPLES[gender] || []).slice(0, C.PREVIEW_MAX - list.length).map((x, i) => {
+      const ns = (x.nights || []).filter(n => upcoming.includes(n));
+      return {id: `sample-${gender[0]}${i + 1}`, name: x.name, college: x.college, nights: ns.length ? ns : upcoming.slice(0, 2), prompt: x.line ? {id: 'flag', text: x.line} : null, photo: x.photo, sample: true};
+    });
+    list = [...list, ...fill];
+  }
+  const count = C.SHOW_COUNTS && eligible.length >= C.COUNT_MIN ? eligible.length : null;
+  const body = {profiles: list, count};
   previewCache = {[key]: {at: now(), body}, ...Object.fromEntries(Object.entries(previewCache).slice(0, 40))};
   return body;
 });
@@ -330,8 +351,7 @@ route('PUT', '/api/profile', ({req, body}) => {
   const venue = clean(body.venue, 40) || null; if (venue === '__other') bad('Type where you are going.');
   let prompt = null;
   if (body.prompt && ENUMS.prompt.includes(body.prompt.id)) { const t = noContacts(clean(body.prompt.text, 60)); if (t.length >= 2) prompt = {id: body.prompt.id, text: t}; }
-  const photosIn = Array.isArray(body.photos) ? body.photos : [];
-  if (!photosIn.length) bad('Add at least one photo.');
+  const photosIn = Array.isArray(body.photos) ? body.photos : []; // a card may start without a photo; nobody sees it until it has one
   if (photosIn.length > C.MAX_PHOTOS) bad(`Up to ${C.MAX_PHOTOS} photos.`);
   const old = profileOf(u.id), keep = new Set(photoNames(old));
   const names = photosIn.map(src => savePhoto(u.id, src, keep));
@@ -342,7 +362,8 @@ route('PUT', '/api/profile', ({req, body}) => {
     sticks: opt('sticks', body.sticks), outfit: opt('outfit', body.outfit), knuckle: opt('knuckle', body.knuckle), prompt, ride,
     seats: ride === 'own' ? Math.max(1, Math.min(3, +body.seats || 1)) : 0, rideConsent: !!body.rideConsent,
     // new cards are in the Garba Queen/King race unless they say otherwise; an existing card keeps its stored choice unless it is sent
-    inBoard: body.inBoard === undefined ? (old ? !!old.inBoard : true) : !!body.inBoard};
+    inBoard: body.inBoard === undefined ? (old ? !!old.inBoard : true) : !!body.inBoard,
+    paused: body.paused === undefined ? !!old?.paused : !!body.paused};
   const t = now();
   q(`INSERT INTO profiles(user_id, data, in_board, hidden, created_at, updated_at) VALUES(?,?,?,0,?,?)
      ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, in_board=excluded.in_board, updated_at=excluded.updated_at`).run(u.id, JSON.stringify(p), p.inBoard ? 1 : 0, t, t);
@@ -359,7 +380,7 @@ route('GET', '/api/feed', ({req, url}) => {
   const t = now();
   const swiped = new Map(q('SELECT to_id, dir, at, retried FROM swipes WHERE from_id=?').all(u.id).map(r => [r.to_id, r]));
   const blocked = new Set(q('SELECT to_id x FROM blocks WHERE from_id=? UNION SELECT from_id x FROM blocks WHERE to_id=?').all(u.id, u.id).map(r => r.x));
-  const rows = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE p.hidden=0 AND u.gender=? AND u.adult=1 AND u.id<>?`).all(u.gender === 'female' ? 'male' : 'female', u.id);
+  const rows = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.gender=? AND u.adult=1 AND u.id<>?`).all(u.gender === 'female' ? 'male' : 'female', u.id);
   let list = [];
   for (const r of rows) {
     if (blocked.has(r.id)) continue;
@@ -391,7 +412,7 @@ function matchJson(m, meId) {
 route('POST', '/api/swipe', async ({req, body}) => {
   const u = authUser(req); needProfile(u);
   const dir = body.dir === 'right' ? 'right' : body.dir === 'left' ? 'left' : bad('Bad swipe.');
-  const target = q('SELECT u.* FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=? AND p.hidden=0').get(String(body.targetId || ''));
+  const target = q(`SELECT u.* FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=? AND ${VISIBLE('p')}`).get(String(body.targetId || ''));
   if (!target || target.id === u.id || target.gender === u.gender) bad('That profile is no longer available.', 404);
   if (blockedPair(u.id, target.id)) bad('That profile is no longer available.', 404);
   const prev = q('SELECT * FROM swipes WHERE from_id=? AND to_id=?').get(u.id, target.id);
@@ -417,7 +438,7 @@ route('POST', '/api/swipe', async ({req, body}) => {
 route('GET', '/api/likes/received', ({req}) => {
   const u = authUser(req); needProfile(u);
   const rows = q(`SELECT s.from_id, s.at, u.*, p.data, mine.dir mydir FROM swipes s
-     JOIN users u ON u.id=s.from_id JOIN profiles p ON p.user_id=s.from_id AND p.hidden=0
+     JOIN users u ON u.id=s.from_id JOIN profiles p ON p.user_id=s.from_id AND ${VISIBLE('p')}
      LEFT JOIN swipes mine ON mine.from_id=? AND mine.to_id=s.from_id
      WHERE s.to_id=? AND s.dir='right' AND (mine.dir IS NULL OR mine.dir<>'right')
        AND NOT EXISTS (SELECT 1 FROM dismissed d WHERE d.from_id=? AND d.to_id=s.from_id)
@@ -434,7 +455,7 @@ route('POST', '/api/likes/dismiss', ({req, body}) => {
 /* Sent: people I liked who haven't liked me back (yet) */
 route('GET', '/api/likes/sent', ({req}) => {
   const u = authUser(req); needProfile(u);
-  const rows = q(`SELECT s.to_id, s.at, u.*, p.data FROM swipes s JOIN users u ON u.id=s.to_id JOIN profiles p ON p.user_id=s.to_id AND p.hidden=0
+  const rows = q(`SELECT s.to_id, s.at, u.*, p.data FROM swipes s JOIN users u ON u.id=s.to_id JOIN profiles p ON p.user_id=s.to_id AND ${VISIBLE('p')}
      WHERE s.from_id=? AND s.dir='right' ORDER BY s.at DESC`).all(u.id);
   const sent = rows.filter(r => !blockedPair(u.id, r.to_id) && !q('SELECT 1 FROM matches WHERE a=? AND b=?').get(...[u.id, r.to_id].sort()))
     .map(r => ({person: card(r, JSON.parse(r.data)), at: r.at}));
@@ -490,7 +511,7 @@ function rankBoard(gender, period) {
   const key = gender + ':' + period, c = lbCache[key];
   if (c && now() - c.at < C.LB_REFRESH_MS) return c.rows;
   const rows = q(`SELECT s.to_id id, COUNT(*) n FROM swipes s
-      JOIN profiles pt ON pt.user_id=s.to_id AND pt.in_board=1 AND pt.hidden=0
+      JOIN profiles pt ON pt.user_id=s.to_id AND pt.in_board=1 AND ${VISIBLE('pt')}
       JOIN users ut ON ut.id=s.to_id AND ut.gender=?
       JOIN profiles pf ON pf.user_id=s.from_id AND pf.hidden=0
       WHERE s.dir='right' ${period === 'tonight' ? 'AND s.day=?' : ''}
@@ -524,6 +545,15 @@ route('POST', '/api/leaderboard/opt', ({req, body}) => {
   q('UPDATE profiles SET data=?, in_board=?, updated_at=? WHERE user_id=?').run(JSON.stringify(p), p.inBoard ? 1 : 0, now(), u.id);
   lbCache = {};
   return {ok: true};
+});
+
+/* Pause: the card leaves everyone's feed, the guest peek and the board; pairs, chats and picks stay. Unpause any time. */
+route('POST', '/api/profile/pause', ({req, body}) => {
+  const u = authUser(req); const p = needProfile(u);
+  p.paused = !!body.paused;
+  q('UPDATE profiles SET data=?, updated_at=? WHERE user_id=?').run(JSON.stringify(p), now(), u.id);
+  bustCaches();
+  return {ok: true, paused: p.paused};
 });
 
 route('POST', '/api/report', ({req, body}) => {

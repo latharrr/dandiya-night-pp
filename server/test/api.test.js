@@ -4,7 +4,7 @@ const {spawn} = require('node:child_process'); const os = require('node:os'); co
 const PORT = 8099 + Math.floor(Math.random() * 500);
 const ORIGIN = 'http://127.0.0.1:' + PORT, B = ORIGIN + '/api';
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'st-test-'));
-const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {env: {...process.env, NODE_ENV: 'test', DEV_OTP: '1234', LB_REFRESH_MS: '0', PICAPOOL_WEBHOOK_SECRET: 'hook-secret', PORT: String(PORT), DATA_DIR: DIR}, stdio: 'ignore'});
+const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {env: {...process.env, NODE_ENV: 'test', DEV_OTP: '1234', LB_REFRESH_MS: '0', PICAPOOL_WEBHOOK_SECRET: 'hook-secret', SAMPLE_PROFILES: '0', COUNT_MIN: '3', PORT: String(PORT), DATA_DIR: DIR}, stdio: 'ignore'});
 const done = () => { srv.kill(); fs.rmSync(DIR, {recursive: true, force: true}); };
 const j = async (m, p, body, tok) => { const r = await fetch(B + p, {method: m, headers: {'Content-Type': 'application/json', ...(tok ? {Authorization: 'Bearer ' + tok} : {})}, body: body ? JSON.stringify(body) : undefined});
   const t = await r.text(); let o = {}; try { o = t ? JSON.parse(t) : {}; } catch (e) { o = {raw: t}; } return {s: r.status, o}; };
@@ -45,9 +45,10 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   { const bare = await j('PUT', '/profile', {photos: [jpg], nights: ['d6']}, b); ok(bare.s === 200 && bare.o.profile.knuckle === null, 'card needs only photo + nights'); }
   ok((await j('PUT', '/profile', {photos: [jpg], nights: []}, b)).s === 400, 'nights still required');
   ok((await j('PUT', '/profile', {photos: [jpg], nights: ['d6'], knuckle: 'huge'}, b)).s === 400, 'bad optional value rejected');
-  const pv = await j('GET', '/preview?gender=male&nights=d6'); ok(pv.s === 200 && pv.o.profiles.length === 1 && pv.o.profiles[0].thumb === thumb, 'guest preview lists the guy with a thumbnail');
-  const pvc = pv.o.profiles[0]; ok(!('photos' in pvc) && !('phone' in pvc) && !('venue' in pvc), 'guest preview has no photos, phone or venue');
-  ok(Object.keys(pvc).sort().join() === 'college,id,name,nights,prompt,thumb', 'guest preview sends only name, college, nights, line, thumb');
+  const pv = await j('GET', '/preview?gender=male&nights=d6'); ok(pv.s === 200 && pv.o.profiles.length === 1 && /^\/photos\//.test(pv.o.profiles[0].photo), 'guest preview lists the guy with his main photo (clear, v2)');
+  const pvc = pv.o.profiles[0]; ok(!('photos' in pvc) && !('phone' in pvc) && !('venue' in pvc), 'guest preview has only the main photo, no phone or venue');
+  ok(pv.o.count === null, 'count not sent below COUNT_MIN');
+  ok(Object.keys(pvc).sort().join() === 'college,id,name,nights,photo,prompt', 'guest preview sends only name, college, nights, line, main photo');
   { const pp = await login('9855555555');
     ok((await hook({phone: '9855555555', picapoolId: 'pp_sim', firstName: 'Simran Kaur', gender: 'female', college: 'Miranda House'})).o.linked, 'signed up on Picapool before making a card → linked');
     const lk = await j('POST', '/picapool/lookup', {}, pp); ok(lk.o.user.firstName === 'Simran' && lk.o.user.gender === 'female' && lk.o.user.hasPicapool === true, 'page gets the Picapool first name and gender');
@@ -57,7 +58,8 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
     const np = await j('PUT', '/profile', {photos: [jpg], nights: ['d6']}, fresh); ok(np.s === 200 && np.o.profile.inBoard === true, 'a new card joins the race automatically');
     for (let i = 0; i < 7; i++) { const id = 'u_pv' + i; sql(`INSERT INTO users(id, phone, first_name, gender, college, adult, created_at) VALUES(?,?,?,?,?,1,?)`, id, '51000000' + i, 'Guy' + i, 'male', 'Hindu College', Date.now());
       sql(`INSERT INTO profiles(user_id, data, in_board, hidden, created_at, updated_at) VALUES(?,?,1,0,?,?)`, id, JSON.stringify({photos: ['/photos/x.jpg'], nights: ['d8'], inBoard: true}), Date.now(), Date.now()); }
-    ok((await j('GET', '/preview?gender=male&nights=d8')).o.profiles.length === 5, 'guest preview returns at most 5 people');
+    { const p5 = await j('GET', '/preview?gender=male&nights=d8'); ok(p5.o.profiles.length === 5, 'guest preview returns at most 5 people');
+      ok(p5.o.count === 7, 'guest preview counts everyone on those nights (' + p5.o.count + ')'); }
     { const day = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Kolkata'}).format(new Date()), mira = sql("SELECT id FROM users WHERE phone='9844444444'")[0].id;
       sql(`INSERT INTO swipes(from_id, to_id, dir, day, at) VALUES(?,?,?,?,?)`, mira, 'u_pv3', 'right', day, Date.now());
       sql(`INSERT INTO swipes(from_id, to_id, dir, day, at) VALUES(?,?,?,?,?)`, sql("SELECT id FROM users WHERE phone='9811111111'")[0].id, 'u_pv3', 'right', day, Date.now());
@@ -72,7 +74,26 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   { const five = await j('PUT', '/profile', {photos: [jpg, jpg, jpg, jpg, jpg], nights: ['d6']}, b); ok(five.s === 200 && five.o.profile.photos.length === 5, '5 photos accepted'); }
   { const six = await j('PUT', '/profile', {photos: [jpg, jpg, jpg, jpg, jpg, jpg], nights: ['d6']}, b); ok(six.s === 400 && /5 photos/.test(six.o.message), '6 photos rejected: "' + six.o.message + '"'); }
   ok((await j('PUT', '/profile', prof(), b)).s === 200, 'guy card restored');
-  ok((await j('GET', '/preview?gender=male&nights=d6')).o.profiles[0].thumb === thumb, 'thumbnail kept when not resent');
+  ok((await j('GET', '/preview?gender=male&nights=d6')).o.profiles[0].photo.startsWith('/photos/'), 'preview photo is the main photo');
+  // v2: a card can start without a photo (asked after the first swipe); nobody sees it until it has one
+  { const np = await login('9866666666');
+    ok((await j('POST', '/account', {firstName: 'Dev', gender: 'male', college: 'Ramjas College', adult: true}, np)).s === 200, 'account for a photo-less card');
+    const c0 = await j('PUT', '/profile', {photos: [], nights: ['d6']}, np); ok(c0.s === 200 && c0.o.profile.photos.length === 0, 'card without a photo is accepted');
+    ok(!(await j('GET', '/preview?gender=male&nights=d6')).o.profiles.some(p => p.name === 'Dev'), 'photo-less card not in the guest preview');
+    ok(!(await j('GET', '/feed?all=1', null, g)).o.profiles.some(p => p.name === 'Dev'), 'photo-less card not in anyone\'s feed');
+    const devId = sql("SELECT id FROM users WHERE phone='9866666666'")[0].id;
+    ok((await j('POST', '/swipe', {targetId: devId, dir: 'right'}, g)).s === 404, "can't pick a photo-less card");
+    ok((await j('GET', '/feed?all=1', null, np)).s === 200, 'photo-less person can still see the feed');
+    const c1 = await j('PUT', '/profile', {photos: [jpg], nights: ['d6']}, np); ok(c1.s === 200, 'photo added later');
+    ok((await j('GET', '/feed?all=1', null, g)).o.profiles.some(p => p.name === 'Dev'), 'card visible once it has a photo');
+    ok((await j('POST', '/profile/pause', {paused: true}, np)).o.paused === true, 'pause');
+    ok(!(await j('GET', '/feed?all=1', null, g)).o.profiles.some(p => p.name === 'Dev'), 'paused card leaves the feed');
+    ok(!(await j('GET', '/preview?gender=male&nights=d6')).o.profiles.some(p => p.name === 'Dev'), 'paused card leaves the guest preview');
+    const kept = await j('PUT', '/profile', {photos: c1.o.profile.photos, nights: ['d6', 'd7']}, np); ok(kept.o.profile.paused === true, 'editing a card keeps it paused');
+    ok((await j('POST', '/profile/pause', {paused: false}, np)).o.paused === false, 'unpause');
+    ok((await j('GET', '/feed?all=1', null, g)).o.profiles.some(p => p.name === 'Dev'), 'unpaused card is back');
+    ok((await j('POST', '/profile/pause', {paused: true})).s === 401, 'pause needs login');
+    ok((await j('DELETE', '/profile', null, np)).s === 200, 'cleanup photo-less test'); }
   const fg = await j('GET', '/feed?all=0', null, g); ok(fg.s === 200 && fg.o.profiles.length === 1 && fg.o.profiles[0].name === 'Kabir' && fg.o.rightsLeftToday === 40, 'girl sees guy in feed');
   ok(!('phone' in fg.o.profiles[0]) && !('rideConsent' in fg.o.profiles[0]), 'card has no phone / private fields');
   const kid = fg.o.profiles[0].id, rid = (await j('GET', '/feed?all=0', null, b)).o.profiles[0].id;
@@ -137,7 +158,7 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   ok((await j('GET', '/matches', null, g)).o.matches.length === 0, 'reported/blocked match disappears');
   const ev = await fetch(B + '/events', {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({event: 'landing_view', sessionId: 's9811111111', ref: 'x'})}); ok(ev.status === 204, 'event beacon (text/plain)');
   ok((await j('GET', '/admin/summary')).s === 403, 'admin needs key');
-  const ad = await fetch(B + '/admin/summary', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(ad.accounts.completed === 4 && ad.identityConflicts === 0 && ad.topRefs[0].ref === 'shraddha' && ad.matches.chats === 1, 'admin summary: accounts, refs, chats');
+  const ad = await fetch(B + '/admin/summary', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(ad.accounts.completed === 5 && ad.identityConflicts === 0 && ad.topRefs[0].ref === 'shraddha' && ad.matches.chats === 1, 'admin summary: accounts, refs, chats');
   ok((await j('DELETE', '/profile', null, b)).s === 200, 'delete profile');
   ok((await j('GET', '/feed', null, b)).s === 409, 'feed needs profile after delete');
   const kidPhotoGone = await fetch(ORIGIN + '/photos/' + 'nope.jpg'); ok(kidPhotoGone.status === 404, '404 on missing photo');
@@ -146,5 +167,15 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   const page = await fetch(ORIGIN + '/shraddha'); const html = await page.text(); ok(page.status === 200 && html.includes("MODE: 'live'"), 'slug path serves live page');
   ok((await fetch(ORIGIN + '/admin')).status === 200, 'admin page served');
   ok((await j('GET', '/nope')).s === 404, 'unknown api 404');
+  // sample people fill the guest peek (a second server with SAMPLE_PROFILES on, fresh data)
+  { const P2 = PORT + 600, D2 = fs.mkdtempSync(path.join(os.tmpdir(), 'st-test-s-'));
+    const s2 = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {env: {...process.env, NODE_ENV: 'test', DEV_OTP: '1234', PORT: String(P2), DATA_DIR: D2}, stdio: 'ignore'});
+    await new Promise(r => setTimeout(r, 900));
+    try {
+      const r = await fetch(`http://127.0.0.1:${P2}/api/preview?gender=female`).then(x => x.json());
+      ok(r.profiles.length === 5 && r.profiles.every(p => p.sample === true && /^sample-f\d$/.test(p.id) && /^https:/.test(p.photo)), 'empty side: 5 labelled sample people fill the guest peek');
+      ok(r.count === null, 'samples never count as people going');
+      ok(r.profiles.every(p => p.nights.length > 0), 'samples always have a night');
+    } finally { s2.kill(); fs.rmSync(D2, {recursive: true, force: true}); } }
   console.log(process.exitCode ? '\nSOME CHECKS FAILED' : '\nALL CHECKS PASSED');
 })().catch(e => { console.log('CRASH', e); process.exitCode = 1; }).finally(done);
