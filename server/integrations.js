@@ -5,7 +5,8 @@
  */
 'use strict';
 
-const DEV = process.env.NODE_ENV !== 'production';
+// Dev-only behaviour (codes printed to the log) needs NODE_ENV=development or test. Unset or production = never fake a send.
+const DEV = ['development', 'test'].includes(process.env.NODE_ENV);
 
 module.exports = {
   /**

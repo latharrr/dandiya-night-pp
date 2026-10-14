@@ -12,7 +12,7 @@ Build `2026-10-15-v2.1` · 15 Oct 2026 (v2.1: team feedback round 1) · Built on
 
 ```bash
 node 2-dandiya-nights-code.js          # → ./dandiya-nights/
-cd dandiya-nights/server && npm test   # 139 checks, ends with "ALL CHECKS PASSED"
+cd dandiya-nights/server && npm test   # 160 checks, ends with "ALL CHECKS PASSED"
 ```
 
 ## 0. Do this (Picapool tech team)
@@ -62,6 +62,13 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 - **Review skipped profiles:** at the end of the deck, a main button "Review skipped profiles" (when there are any). Picking someone there changes the decision; the rest stay skipped. A "Reviewing skipped profiles · Done" bar shows while reviewing.
 - Demo and samples now use 15 young Indian adults a side (Unsplash licence); replace before launch (§0 step 10).
 
+**v2.1 security and performance pass (15 Oct)** (details in §17)
+- Dev shortcuts (fixed login code `1234`, admin key `dev-admin`) only work with `NODE_ENV=development`/`test`. A server started without `NODE_ENV` is production-safe. **Always start production with `NODE_ENV=production`** (`npm start` does).
+- Rate limits use the real client IP behind the proxy (a forged `X-Forwarded-For` can't dodge them), count signed-in people per session (a hostel on one Wi-Fi no longer shares one limit), and cap login codes per network per hour (stops bulk sending, which costs money).
+- Logins last 30 days; Log out ends the session on the server. Constant-time checks for the admin key, webhook secret and codes. Admin key by header only.
+- Photo type detected from the file itself (fake WebP refused, the stored type follows the real bytes); photos served sandboxed. No phone numbers in "Where".
+- Same-origin API by default (no `CORS *`), browser security headers (CSP, no framing, HSTS in production), `/api/stats` admin-only, database indexes for polling, shorter connection timeouts.
+
 **Server**: photo-optional passes, `VISIBLE` rule (not hidden, has a photo, not paused) on every list, clear photo + `count` + samples in `/api/preview`, `/api/profile/pause`, admin counts for passes without a photo and paused passes. 24 new checks (137 in total).
 
 ## 1. Folder (after unpacking)
@@ -72,7 +79,7 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 | `server/samples.json` | Sample people for the guest peek (replace the photos, §0 step 10) |
 | `server/public/index.html` | The page, already in live mode. Mobile-first, full screen on phones, a centred column on laptops |
 | `server/public/admin.html` | `/admin`: numbers, nightly top-20 check, reports, Picapool clashes, hide/unhide |
-| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 139 checks. Never touches real data |
+| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 160 checks. Never touches real data |
 | `server/seed.js` · `export.js` · `Dockerfile` | Fake test profiles (`npm run seed:test` / `seed:remove`) · CSV of accounts (`npm run export`) · Docker |
 | `demo.html` | Same as `3-demo.html` |
 | `source/` | `template.html` (the one source for the page), `build.py`, logo files, `fonts/` (DM Serif Display + Figtree, SIL Open Font License). After a change: `python3 source/build.py` rewrites `server/public/index.html` and `demo.html` |
@@ -82,7 +89,7 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 ## 2. Run locally
 ```bash
 cd server
-npm test                 # 139 checks
+npm test                 # 160 checks
 npm run seed:test        # 20 fake girls + 20 fake guys (phones start with 5)
 npm run dev              # http://localhost:8080 · login code is always 1234 · codes print in the log
 ```
@@ -99,8 +106,8 @@ HTTPS on `dandiya.picapool.tech` via nginx or Caddy. **One instance only** (SQLi
 
 | Env var | Default | Notes |
 |---|---|---|
-| `NODE_ENV` | — | `production`: refuses to start without `ADMIN_KEY`, never fakes codes |
-| `ADMIN_KEY` | `dev-admin` in dev | **Required in production.** Protects `/admin` |
+| `NODE_ENV` | — | **`production` on the server** (refuses to start without `ADMIN_KEY`, never fakes codes, sends HSTS). `development` locally (`npm run dev`). Unset = production-safe defaults plus a warning |
+| `ADMIN_KEY` | `dev-admin` only in development/test | **Required in production.** Long random value. Protects `/admin` and `/api/stats`; sent as the `X-Admin-Key` header only |
 | `PICAPOOL_WEBHOOK_SECRET` | empty (push disabled) | Shared secret for Picapool's backend → `X-Picapool-Secret` header (§4b) |
 | `DATA_DIR` | `./data` | Database and photos. Back it up |
 | `PORT` | `8080` | |
@@ -114,8 +121,10 @@ HTTPS on `dandiya.picapool.tech` via nginx or Caddy. **One instance only** (SQLi
 | `SAMPLE_PROFILES` | on | **New.** `0` = never fill the guest peek with sample people |
 | `SHOW_COUNTS` | on | **New.** `0` = never send "how many are going" counts (§0 step 11) |
 | `COUNT_MIN` | `20` | **New.** Below this many people the count isn't sent; the page shows the line without a number |
-| `PUBLIC_URL`, `CORS_ORIGIN` | empty, `*` | Only if the page and the API are on different domains |
-| `DEV_OTP` | — | Fixed login code for local testing. Ignored in production |
+| `PUBLIC_URL`, `CORS_ORIGIN` | empty, empty | Only if the page and the API are on different domains. Empty `CORS_ORIGIN` = same-origin only |
+| `SESSION_DAYS` | `30` | How long a login lasts |
+| `OTP_PER_IP_HOUR`, `VERIFY_PER_IP_HOUR` | `40`, `120` | Codes requested / tried per network per hour. Raise if a whole hostel signs up at once from one Wi-Fi |
+| `DEV_OTP` | — | Fixed login code for local testing. Only works with `NODE_ENV=development` or `test` |
 
 ## 4. Connect Picapool (`server/integrations.js`)
 | Function / flag | Called when | If you don't wire it |
@@ -207,7 +216,8 @@ Don't change `MODE` (`'live'`) or `API_BASE` (`'/api'`).
 |---|---|---|
 | `GET /api/preview?gender=female\|male&nights=d5,d6` | public | **Changed.** Guest peek and sign-up crowd: tonight's top 5 (board order, then a daily shuffle), then samples. `{profiles: [{id, name, college, nights, prompt, photo, sample?}], count}`. Never phones or venues. `count` = real visible people on those nights, or `null` (§3). Cached 2 min |
 | `GET /api/leaderboard?board=queen\|king&period=tonight\|week` | optional | **Changed.** Up to 20 per board: picked people first, then the rest of the race. Name, college, photo. With a token adds `me: {count, rank}` (private; `rank` only if picked) |
-| `POST /api/auth/otp` `{phone}` · `POST /api/auth/verify` `{phone, code, ref, entry, sessionId}` | public | Codes: 30 s cooldown, 5/hour per phone, 5 tries, 10 min expiry → `{token, user, profile}` |
+| `POST /api/auth/otp` `{phone}` · `POST /api/auth/verify` `{phone, code, ref, entry, sessionId}` | public | Codes: 30 s cooldown, 5/hour per phone, 40/hour per network, 5 tries, 10 min expiry → `{token, user, profile}`. Tokens last 30 days |
+| `POST /api/auth/logout` | token | **New.** Ends this session on the server |
 | `POST /api/picapool/lookup` | token | → `{status: 'found'\|'not_found'\|'unavailable', user, synced?}` |
 | `POST /api/integrations/picapool-user` | `X-Picapool-Secret` | Picapool's push (§4b) |
 | `POST /api/account` `{firstName, gender, college, adult:true}` | token | Creates/updates the account (also used to edit the college). Picapool's name and gender win once linked |
@@ -223,7 +233,7 @@ Don't change `MODE` (`'live'`) or `API_BASE` (`'/api'`).
 | `POST /api/report {targetId, reason}` · `POST /api/block` | token | Report also blocks; 3 reports hide the pass |
 | `DELETE /api/profile` | token | Deletes pass, photos, picks, pairs. Account stays |
 | `POST /api/events` | public | Analytics (§11) |
-| `GET /api/stats` | public | Counts (admin use only) |
+| `GET /api/stats` | `X-Admin-Key` | **Changed: admin only.** Counts by night and college |
 | `/api/admin/summary · top · reports · hide · conflicts` | `X-Admin-Key` | Used by `/admin` |
 
 ## 8. Crowns and sharing
@@ -307,6 +317,20 @@ On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 - Motion: floating crowd, card deal and pop-ins are all turned off with "reduce motion".
 - Screen readers: every screen has a heading; dialogs are labelled; the card behind the top one is hidden; the code boxes say "Digit 1 of 4".
 
+## 17. Security and performance (v2.1)
+| Area | What's in place |
+|---|---|
+| Login | WhatsApp code: 30 s cooldown, 5 codes/hour per phone, 40/hour per network, 5 wrong tries then a new code is needed, 10 min expiry, stored as a hash and compared in constant time. Sessions: random 32-byte tokens stored hashed, 30-day expiry, real logout |
+| Dev shortcuts | Fixed code and default admin key only with `NODE_ENV=development`/`test`; `integrations.js` never fakes a send otherwise |
+| Rate limits | Per session when signed in (900 / 5 min), per IP when not (1,500 / 5 min). Real IP = last `X-Forwarded-For` entry with `TRUST_PROXY=1` |
+| Admin & webhook | `X-Admin-Key` header only, constant-time compare; webhook secret constant-time; `/api/stats` admin-only |
+| Uploads | Max 1.5 MB per photo, 5 photos; type from the file's own bytes (JPEG/PNG/WebP only); random file names; served with a sandbox CSP and `nosniff` |
+| Text | Names letters-only; free text stripped of control characters, `<` `>`, phone numbers, @handles and links (line, first message, "Where") |
+| Browser | CSP (scripts and connections only to this server; images from this server, Unsplash, data/blob), no framing, `nosniff`, strict referrer, permissions off, HSTS in production. No CORS unless `CORS_ORIGIN` is set |
+| Privacy | Phones never leave the server except to the other person after both agree. Date of birth never sent. Under-18 attempts deleted |
+| Performance | Indexes on pairs (both sides), reports, sessions, the board; board and guest peek cached 15 s / 2 min; open boards refresh every 15 s, pairs every 45 s, both paused when the page is hidden; connections time out after 30 s |
+| Still on you | HTTPS at nginx/Caddy; back up `DATA_DIR`; keep `ADMIN_KEY` and `PICAPOOL_WEBHOOK_SECRET` long and random; one instance only (SQLite) |
+
 ## 16. Decisions log
 | Build | Decision | By |
 |---|---|---|
@@ -316,4 +340,5 @@ On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 | v2 | No progress bar | Deepanshu, 14 Oct |
 | v2 | Gaps filled: report/block on every card and pair, pause, "Where, mostly?", garba plan in Say hi, WhatsApp-alert line on the reveal, daily limit sheet, look at people you skipped, crown poster kept, log in goes straight to Discover | Deepanshu, 14 Oct |
 | v2.1 | Team feedback round 1: code-screen scroll fix, story sharing restored, live boards with 15+ a side, photo upload prompted, line prompt after 5 swipes, review skipped profiles. Design changes for screens 2–4 and Krish's cosmetic changes still to come | Team, 15 Oct |
+| v2.1 | Security and performance pass: see §17 | 15 Oct |
 | v2 | **Counts on** (sign-up crowd and reveal), behind `SHOW_COUNTS` and `COUNT_MIN`. Overrides build k's "no counts" rule; **Purav to confirm** | Deepanshu, 14 Oct; Purav to confirm |

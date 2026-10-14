@@ -554,6 +554,7 @@ class LiveApi {
   report(targetId, reason)       { return this.req('POST', '/report', {targetId, reason}); }
   block(targetId)                { return this.req('POST', '/block', {targetId}); }
   deleteProfile()                { return this.req('DELETE', '/profile'); }
+  logout()                       { return this.req('POST', '/auth/logout', {}); }
 }
 
 /* ---- demo backend: sample people, all in this browser ---- */
@@ -682,6 +683,7 @@ class MockApi {
   async report() { await sleep(200); return {ok: true}; }
   async block() { return {ok: true}; }
   async deleteProfile() { await sleep(300); if (this.db.users[S.phone]) this.db.users[S.phone].profile = null; this.persist(); return {ok: true}; }
+  async logout() { return {ok: true}; }
 }
 const api = isDemo() ? new MockApi() : new LiveApi();
 let serverRightsLeft = null;
@@ -1708,7 +1710,7 @@ function renderMe() {
     $('#yesDel', s).onclick = async () => { $('#yesDel', s).disabled = true; try { await api.deleteProfile(); } catch (e) { $('#yesDel', s).disabled = false; return toast(esc(e.message)); }
       track('profile_deleted'); S.profile = null; S.swipes = {}; S.matches = []; S.seenMatchIds = []; feed.queue = []; save(); closeSheet(); go('landing'); toast('Your Dandiya pass is deleted.'); };
   });
-  $('#out').onclick = () => { const ref = S.ref, entry = S.entry; S = Object.assign(freshState(), {ref, entry}); save(); feed = {queue: [], allNights: false, peekLoaded: false, mode: 'new'}; tab = 'feed'; crowdCache = {}; go('landing'); };
+  $('#out').onclick = () => { api.logout().catch(() => {}); const ref = S.ref, entry = S.entry; S = Object.assign(freshState(), {ref, entry}); save(); feed = {queue: [], allNights: false, peekLoaded: false, mode: 'new'}; tab = 'feed'; crowdCache = {}; go('landing'); };
 }
 
 /* ---------- photos: up to 5, several at once, the first is the main photo ---------- */

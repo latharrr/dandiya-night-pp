@@ -153,11 +153,14 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   ok((await j('POST', '/leaderboard/opt', {optIn: false}, g)).s === 200, 'opt out');
   { const keep = await j('PUT', '/profile', {photos: [jpg], nights: ['d6']}, g); ok(keep.s === 200 && keep.o.profile.inBoard === false, 'editing a card keeps a stored opt-out'); }
   ok((await j('GET', '/leaderboard?board=queen&period=week')).o.top.length === 0, 'opted-out hidden from board');
-  const st = await j('GET', '/stats'); ok(st.o.total === 2 && st.o.byNight.d6 === 2, 'stats counts');
+  ok((await j('GET', '/stats')).s === 403, 'stats are admin-only');
+  const st = await fetch(B + '/stats', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(st.total === 2 && st.byNight.d6 === 2, 'stats counts (admin)');
   ok((await j('POST', '/report', {targetId: kid, reason: 'Fake profile'}, g)).s === 200, 'report');
   ok((await j('GET', '/matches', null, g)).o.matches.length === 0, 'reported/blocked match disappears');
   const ev = await fetch(B + '/events', {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({event: 'landing_view', sessionId: 's9811111111', ref: 'x'})}); ok(ev.status === 204, 'event beacon (text/plain)');
   ok((await j('GET', '/admin/summary')).s === 403, 'admin needs key');
+  ok((await fetch(B + '/admin/summary?key=dev-admin')).status === 403, 'admin key in the URL is refused (header only)');
+  ok((await fetch(B + '/admin/summary', {headers: {'X-Admin-Key': 'dev-admiN'}})).status === 403, 'wrong admin key refused');
   const ad = await fetch(B + '/admin/summary', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(ad.accounts.completed === 5 && ad.identityConflicts === 0 && ad.topRefs[0].ref === 'shraddha' && ad.matches.chats === 1 && ad.profiles.noPhoto === 0 && ad.profiles.paused === 0, 'admin summary: accounts, refs, chats, photo-less and paused passes');
   ok((await j('DELETE', '/profile', null, b)).s === 200, 'delete profile');
   ok((await j('GET', '/feed', null, b)).s === 409, 'feed needs profile after delete');
@@ -176,6 +179,33 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
     ok(!bf.o.top.some(r => r.name === 'NoPhoto'), 'photo-less passes never on the board');
     for (let i = 0; i < 18; i++) { sql('DELETE FROM profiles WHERE user_id=?', 'u_bf' + i); sql('DELETE FROM users WHERE id=?', 'u_bf' + i); }
     sql("DELETE FROM profiles WHERE user_id='u_bfnp'"); sql("DELETE FROM users WHERE id='u_bfnp'"); }
+  // v2.1 security
+  { const pageRes = await fetch(ORIGIN + '/'); const csp = pageRes.headers.get('content-security-policy') || '';
+    ok(/frame-ancestors 'none'/.test(csp) && pageRes.headers.get('x-frame-options') === 'DENY', 'page sends CSP + no framing');
+    ok(!pageRes.headers.get('access-control-allow-origin'), 'no CORS header unless CORS_ORIGIN is set');
+    const sx = await login('9877711111'); ok((await j('POST', '/auth/logout', {}, sx)).s === 200, 'logout');
+    ok((await j('GET', '/matches', null, sx)).s === 401, 'logged-out session no longer works');
+    const sy = await login('9877722222');
+    ok((await j('POST', '/account', {firstName: 'Zoya', gender: 'female', college: 'Hindu College', adult: true}, sy)).s === 200, 'account for security checks');
+    const riff = 'data:image/webp;base64,' + Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVEfmt '), Buffer.alloc(20)]).toString('base64');
+    ok((await j('PUT', '/profile', {photos: [riff], nights: ['d6']}, sy)).s === 400, 'a RIFF file that is not WebP is refused');
+    const lie = await j('PUT', '/profile', {photos: ['data:image/png;base64,' + jpg.split(',')[1]], nights: ['d6'], venue: 'Gate 2, call 9876543210'}, sy);
+    ok(lie.s === 200 && lie.o.profile.photos[0].endsWith('.jpg'), 'stored type follows the real bytes (JPEG sent as PNG → .jpg)');
+    ok(!/\d{6}/.test(lie.o.profile.venue || ''), 'no phone numbers in "where": "' + lie.o.profile.venue + '"');
+    const ph = await fetch(ORIGIN + lie.o.profile.photos[0]); ok(/sandbox/.test(ph.headers.get('content-security-policy') || ''), 'photos are served sandboxed');
+    sql('UPDATE sessions SET created_at=? WHERE user_id=(SELECT id FROM users WHERE phone=?)', Date.now() - 31 * 86400e3, '9877722222');
+    ok((await j('GET', '/feed?all=1', null, sy)).s === 401, 'sessions expire after 30 days');
+    sql("DELETE FROM profiles WHERE user_id=(SELECT id FROM users WHERE phone='9877722222')"); }
+  // per-network code limit, and a forged X-Forwarded-For can't dodge it (a second server: TRUST_PROXY on, limit 3/hour)
+  { const P3 = PORT + 700, D3 = fs.mkdtempSync(path.join(os.tmpdir(), 'st-test-r-'));
+    const s3 = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {env: {...process.env, NODE_ENV: 'test', DEV_OTP: '1234', PORT: String(P3), DATA_DIR: D3, TRUST_PROXY: '1', OTP_PER_IP_HOUR: '3'}, stdio: 'ignore'});
+    await new Promise(r => setTimeout(r, 900));
+    try {
+      const send = (n, xff) => fetch(`http://127.0.0.1:${P3}/api/auth/otp`, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Forwarded-For': xff}, body: JSON.stringify({phone: '96000000' + String(n).padStart(2, '0')})}).then(r => r.status);
+      const codes = []; for (let n = 0; n < 5; n++) codes.push(await send(n, `10.0.0.${n}, 203.0.113.7`));
+      ok(codes.slice(0, 3).every(c => c === 200) && codes.slice(3).every(c => c === 429), 'codes per network capped; forged first X-Forwarded-For entries ignored (' + codes.join(',') + ')');
+      ok(await send(9, '203.0.113.8') === 200, 'another network can still ask for codes');
+    } finally { s3.kill(); fs.rmSync(D3, {recursive: true, force: true}); } }
   // sample people fill the guest peek (a second server with SAMPLE_PROFILES on, fresh data)
   { const P2 = PORT + 600, D2 = fs.mkdtempSync(path.join(os.tmpdir(), 'st-test-s-'));
     const s2 = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {env: {...process.env, NODE_ENV: 'test', DEV_OTP: '1234', PORT: String(P2), DATA_DIR: D2}, stdio: 'ignore'});

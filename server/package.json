@@ -8,8 +8,8 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "DEV_OTP=1234 node server.js",
+    "start": "NODE_ENV=production node server.js",
+    "dev": "NODE_ENV=development DEV_OTP=1234 node server.js",
     "seed:test": "node seed.js 20",
     "seed:remove": "node seed.js --remove",
     "test": "node test/api.test.js",

@@ -18,22 +18,28 @@ const integrations = require('./integrations');
 /* ---------------- config ---------------- */
 const ENV = process.env;
 const PROD = ENV.NODE_ENV === 'production';
+/* Dev shortcuts (fixed login code, default admin key) only work when NODE_ENV is explicitly 'development' or 'test'.
+   A deployment that forgets NODE_ENV gets the safe behaviour: real codes only, no admin until ADMIN_KEY is set. */
+const DEV_MODE = ['development', 'test'].includes(ENV.NODE_ENV);
 const C = {
   PORT: +(ENV.PORT || 8080),
   DATA_DIR: path.resolve(ENV.DATA_DIR || path.join(__dirname, 'data')),
-  ADMIN_KEY: ENV.ADMIN_KEY || (PROD ? '' : 'dev-admin'),
+  ADMIN_KEY: ENV.ADMIN_KEY || (DEV_MODE ? 'dev-admin' : ''),
   DAILY_RIGHT_CAP: +(ENV.DAILY_RIGHT_CAP || 40),
   OTP_LENGTH: +(ENV.OTP_LENGTH || 4),
   OTP_TTL_MS: 10 * 60e3,
   DELETE_ON: ENV.DELETE_ON || '2026-10-20',
   DEEPLINK: ENV.DEEPLINK || 'picapool://chat/{chatId}',
-  CORS_ORIGIN: ENV.CORS_ORIGIN || '*',
+  CORS_ORIGIN: ENV.CORS_ORIGIN || '', // empty = same-origin only (the page is served by this server). Set only if the page lives on another domain
   PUBLIC_URL: (ENV.PUBLIC_URL || '').replace(/\/$/, ''),
   REPORT_HIDE: +(ENV.REPORT_HIDE || 3),
   LB_REFRESH_MS: +(ENV.LB_REFRESH_MS ?? 15e3), // leaderboard is recomputed at most every 15 s; the page refreshes an open board every 15 s
   STATS_REFRESH_MS: +(ENV.STATS_REFRESH_MS || 5 * 60e3),
   TRUST_PROXY: ENV.TRUST_PROXY === '1',
-  DEV_OTP: PROD ? null : (ENV.DEV_OTP || null),
+  DEV_OTP: DEV_MODE ? (ENV.DEV_OTP || null) : null,
+  SESSION_DAYS: +(ENV.SESSION_DAYS || 30),       // a login lasts this long, then the code is asked again
+  OTP_PER_IP_HOUR: +(ENV.OTP_PER_IP_HOUR || 40), // codes one network can request per hour (stops bulk sending; a hostel shares one IP, so not too low)
+  VERIFY_PER_IP_HOUR: +(ENV.VERIFY_PER_IP_HOUR || 120),
   PICAPOOL_WEBHOOK_SECRET: ENV.PICAPOOL_WEBHOOK_SECRET || '', // shared secret for Picapool's backend to push account changes (§4b of HANDOFF)
   MAX_PHOTOS: 5,        // keep equal to CONFIG.MAX_PHOTOS in the page
   BOARD_SIZE: 20,       // top N per board (Garba Queen / Garba King); keep equal to CONFIG.BOARD_SIZE
@@ -45,6 +51,10 @@ const C = {
 // Women-only colleges: never accepted for a guy's account (the page doesn't offer them either)
 const WOMEN_ONLY_COLLEGES = ['daulat ram college', 'daulat ram', 'indraprastha college for women', 'miranda house'];
 if (PROD && !C.ADMIN_KEY) { console.error('Set ADMIN_KEY in production.'); process.exit(1); }
+if (!PROD && !DEV_MODE) console.warn('[warn] NODE_ENV is not set. Running with production-safe defaults (no default admin key, no fixed login code). Use NODE_ENV=production on the server, NODE_ENV=development locally.');
+if (C.ADMIN_KEY && C.ADMIN_KEY.length < 16 && !DEV_MODE) console.warn('[warn] ADMIN_KEY is short. Use a long random value.');
+/* constant-time comparison for secrets (admin key, webhook secret, code hashes) */
+const same = (a, b) => { const x = Buffer.from(String(a ?? '')), y = Buffer.from(String(b ?? '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 const NIGHTS = ['d1','d2','d3','d4','d5','d6','d7','d8','d9'];
 // Navratri 2026 (keep equal to CONFIG.NIGHTS in the page). Used to keep sample people on nights that haven't passed.
 const NIGHT_DATES = NIGHTS.map((id, i) => [id, `2026-10-${String(11 + i).padStart(2, '0')}`]);
@@ -82,6 +92,11 @@ for (const col of ['req_by TEXT', 'req_opener TEXT', 'req_at INTEGER']) { try { 
 // build k: identity sync with Picapool, and "Not for me" on likes you received
 for (const col of ['identity_conflict TEXT', 'picapool_synced_at INTEGER']) { try { db.exec(`ALTER TABLE users ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
 db.exec(`CREATE TABLE IF NOT EXISTS dismissed(from_id TEXT, to_id TEXT, at INTEGER, PRIMARY KEY(from_id, to_id))`);
+// v2.1: indexes for the lookups that run on every poll (pairs by either side, reports per person, sessions per user)
+db.exec(`CREATE INDEX IF NOT EXISTS matches_b ON matches(b);
+CREATE INDEX IF NOT EXISTS reports_to ON reports(to_id, resolved);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS profiles_board ON profiles(in_board, hidden);`);
 const q = sql => db.prepare(sql);
 /* A card is visible to others when it isn't hidden by an admin, has at least one photo and isn't paused by its owner.
    v2: a card can exist without a photo (the photo is asked for after the first swipe); until then nobody sees it. */
@@ -126,18 +141,27 @@ function readBody(req, limit) {
     req.on('error', reject);
   });
 }
-const ipHits = new Map();
-function rateLimit(req) {
-  const ip = (C.TRUST_PROXY && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '?';
-  const t = now(), w = ipHits.get(ip) || {start: t, n: 0};
-  if (t - w.start > 5 * 60e3) { w.start = t; w.n = 0; }
-  w.n++; ipHits.set(ip, w);
-  if (w.n > 900) bad('Too many requests. Wait a few minutes.', 429);
+/* The client's IP. Behind nginx/Caddy (TRUST_PROXY=1) it's the LAST X-Forwarded-For entry: the one the proxy itself added.
+   The first entries are whatever the client sent, so they can't be trusted for limits. */
+const clientIp = req => (C.TRUST_PROXY && String(req.headers['x-forwarded-for'] || '').split(',').map(x => x.trim()).filter(Boolean).pop()) || req.socket.remoteAddress || '?';
+/* Rate limits. Signed-in requests count per session (a whole college on one Wi-Fi shares an IP, so per-IP limits would lock them out together);
+   anonymous requests count per IP. Separate hourly limits per IP for asking for codes and for trying them. */
+const hits = new Map();
+function hit(key, windowMs, max, msg) {
+  const t = now(), w = hits.get(key) || {start: t, n: 0, win: windowMs};
+  if (t - w.start > windowMs) { w.start = t; w.n = 0; }
+  w.n++; hits.set(key, w);
+  if (w.n > max) bad(msg || 'Too many requests. Wait a few minutes.', 429);
 }
-setInterval(() => { const t = now(); for (const [k, w] of ipHits) if (t - w.start > 10 * 60e3) ipHits.delete(k); }, 60e3).unref();
+function rateLimit(req) {
+  const m = /^Bearer (.{20,})$/.exec(req.headers.authorization || '');
+  if (m) hit('s:' + sha(m[1]).slice(0, 24), 5 * 60e3, 900);
+  else hit('ip:' + clientIp(req), 5 * 60e3, 1500);
+}
+setInterval(() => { const t = now(); for (const [k, w] of hits) if (t - w.start > w.win * 2) hits.delete(k); }, 60e3).unref();
 function authUser(req, required = true) {
   const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
-  const s = m && q('SELECT user_id FROM sessions WHERE token_hash=?').get(sha(m[1]));
+  const s = m && q('SELECT user_id FROM sessions WHERE token_hash=? AND created_at>?').get(sha(m[1]), now() - C.SESSION_DAYS * 86400e3);
   const u = s && q('SELECT * FROM users WHERE id=?').get(s.user_id);
   if (!u && required) bad('Please log in again.', 401);
   return u || null;
@@ -155,7 +179,8 @@ const route = (method, pattern, handler, opts = {}) => routes.push({method, re: 
 
 route('GET', '/api/health', () => ({ok: true, day: istDay()}));
 
-route('GET', '/api/stats', () => {
+route('GET', '/api/stats', ({req, url}) => {
+  admin(req, url); // counts by college and night: for the team, not the public
   if (statsCache && now() - statsCache.at < C.STATS_REFRESH_MS) return statsCache.body;
   const rows = q(`SELECT u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')}`).all();
   const byNight = {}, cc = {};
@@ -199,9 +224,10 @@ route('GET', '/api/preview', ({url}) => {
   return body;
 });
 
-route('POST', '/api/auth/otp', async ({body}) => {
+route('POST', '/api/auth/otp', async ({req, body}) => {
   const phone = String(body.phone || '');
   if (!/^[6-9]\d{9}$/.test(phone)) bad('Enter your 10-digit WhatsApp number.');
+  hit('otp:' + clientIp(req), 3600e3, C.OTP_PER_IP_HOUR, 'Too many codes from this network. Try again in a while.');
   const t = now(), o = q('SELECT * FROM otps WHERE phone=?').get(phone);
   if (o && t - o.last_sent < 30e3) bad('Wait 30 seconds before asking for another code.', 429);
   let windowStart = o ? o.window_start : t, count = o ? o.window_count : 0;
@@ -215,12 +241,13 @@ route('POST', '/api/auth/otp', async ({body}) => {
   return {ok: true};
 });
 
-route('POST', '/api/auth/verify', async ({body}) => {
+route('POST', '/api/auth/verify', async ({req, body}) => {
   const phone = String(body.phone || ''), code = String(body.code || '');
+  hit('verify:' + clientIp(req), 3600e3, C.VERIFY_PER_IP_HOUR, 'Too many tries from this network. Try again in a while.');
   const o = q('SELECT * FROM otps WHERE phone=?').get(phone);
   if (!o || !o.code_hash || o.expires_at < now()) bad('That code expired. Tap "Resend code".');
   if (o.attempts >= 5) bad('Too many wrong tries. Tap "Resend code".', 429);
-  if (sha(phone + ':' + code) !== o.code_hash) { q('UPDATE otps SET attempts=attempts+1 WHERE phone=?').run(phone); bad("That code isn't right. Check the message and try again."); }
+  if (!same(sha(phone + ':' + code), o.code_hash)) { q('UPDATE otps SET attempts=attempts+1 WHERE phone=?').run(phone); bad("That code isn't right. Check the message and try again."); }
   q('UPDATE otps SET code_hash=NULL, expires_at=0 WHERE phone=?').run(phone); // keep send-rate history
   let u = q('SELECT * FROM users WHERE phone=?').get(phone);
   if (!u) {
@@ -235,6 +262,13 @@ route('POST', '/api/auth/verify', async ({body}) => {
   q('INSERT INTO sessions(token_hash, user_id, created_at) VALUES(?,?,?)').run(sha(token), u.id, now());
   const known = u.first_name || u.picapool_id;
   return {token, user: known ? userJson(u) : null, profile: profileOf(u.id)};
+});
+
+/* Log out: this session stops working everywhere at once */
+route('POST', '/api/auth/logout', ({req}) => {
+  const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
+  if (m) q('DELETE FROM sessions WHERE token_hash=?').run(sha(m[1]));
+  return {ok: true};
 });
 
 /* ---------- Picapool account sync ----------
@@ -286,7 +320,7 @@ route('POST', '/api/picapool/lookup', async ({req}) => {
    so a person who signs up in the app is linked in real time, even with the page closed.
    Header X-Picapool-Secret must equal PICAPOOL_WEBHOOK_SECRET. Body: {phone, picapoolId, firstName?, gender?, college?, deleted?} */
 route('POST', '/api/integrations/picapool-user', ({req, body}) => {
-  if (!C.PICAPOOL_WEBHOOK_SECRET || req.headers['x-picapool-secret'] !== C.PICAPOOL_WEBHOOK_SECRET) bad('Not allowed.', 403);
+  if (!C.PICAPOOL_WEBHOOK_SECRET || !same(req.headers['x-picapool-secret'], C.PICAPOOL_WEBHOOK_SECRET)) bad('Not allowed.', 403);
   const phone = String(body.phone || '').replace(/\D/g, '').slice(-10);
   if (!/^[6-9]\d{9}$/.test(phone)) bad('Bad phone.');
   const u = q('SELECT * FROM users WHERE phone=?').get(phone);
@@ -332,11 +366,15 @@ function savePhoto(userId, src, keep) {
   if (m0) { if (!m0[1].startsWith(userId + '-') || !keep.has(m0[1])) bad('Bad photo.'); return m0[1]; }
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(src);
   if (!m) bad('Photos must be JPG or PNG.');
+  if (m[2].length > 2.1e6) bad('That photo is too big.');
   const buf = Buffer.from(m[2], 'base64');
   if (buf.length > 1.5e6) bad('That photo is too big.');
-  const sig = buf.subarray(0, 4).toString('hex');
-  if (!(sig.startsWith('ffd8') || sig === '89504e47' || sig === '52494646')) bad('Photos must be JPG or PNG.');
-  const name = `${userId}-${crypto.randomBytes(8).toString('hex')}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
+  // the real type comes from the file's first bytes, not from what the upload claims
+  const ext = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff ? 'jpg'
+    : buf.subarray(0, 8).toString('hex') === '89504e470d0a1a0a' ? 'png'
+    : buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP' ? 'webp' : null;
+  if (!ext) bad('Photos must be JPG or PNG.');
+  const name = `${userId}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
   fs.writeFileSync(path.join(PHOTO_DIR, name), buf);
   return name;
 }
@@ -348,7 +386,7 @@ route('PUT', '/api/profile', ({req, body}) => {
   const opt = (k, v) => v === null || v === undefined || v === '' ? null : e(k, v); // filled in later from the Me tab
   const nights = [...new Set(Array.isArray(body.nights) ? body.nights : [])].filter(n => NIGHTS.includes(n));
   if (!nights.length) bad('Pick at least one night.');
-  const venue = clean(body.venue, 40) || null; if (venue === '__other') bad('Type where you are going.');
+  const venue = noContacts(clean(body.venue, 40)) || null; if (venue === '__other') bad('Type where you are going.');
   let prompt = null;
   if (body.prompt && ENUMS.prompt.includes(body.prompt.id)) { const t = noContacts(clean(body.prompt.text, 60)); if (t.length >= 2) prompt = {id: body.prompt.id, text: t}; }
   const photosIn = Array.isArray(body.photos) ? body.photos : []; // a card may start without a photo; nobody sees it until it has one
@@ -608,8 +646,8 @@ route('POST', '/api/events', ({req, body}) => {
 
 /* ---------------- admin ---------------- */
 function admin(req, url) {
-  const k = req.headers['x-admin-key'] || url.searchParams.get('key');
-  if (!C.ADMIN_KEY || k !== C.ADMIN_KEY) bad('Wrong admin key.', 403);
+  // header only: a key in the URL ends up in logs and browser history
+  if (!C.ADMIN_KEY || !same(req.headers['x-admin-key'], C.ADMIN_KEY)) bad('Wrong admin key.', 403);
 }
 route('GET', '/api/admin/summary', ({req, url}) => {
   admin(req, url);
@@ -684,10 +722,19 @@ setInterval(() => { q('DELETE FROM otps WHERE last_sent < ?').run(now() - 2 * 36
 
 /* ---------------- static ---------------- */
 const PUBLIC = path.join(__dirname, 'public');
-function serveFile(res, file, type, cache) {
+/* Browser security headers. The page is one file with inline script and styles; it loads images from this server, data:/blob: (photos being
+   added, story images) and Unsplash (sample photos), and talks only to this server. Nothing may frame it (no clickjacking). */
+const ORIGIN_EXTRA = C.PUBLIC_URL ? ' ' + C.PUBLIC_URL : '';
+const PAGE_HEADERS = {
+  'Content-Security-Policy': `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.unsplash.com${ORIGIN_EXTRA}; font-src 'self' data:; connect-src 'self'${ORIGIN_EXTRA}; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'`,
+  'X-Frame-Options': 'DENY', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+  ...(PROD ? {'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'} : {}),
+};
+const PHOTO_HEADERS = {'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Cross-Origin-Resource-Policy': 'same-site'};
+function serveFile(res, file, type, cache, extra = {}) {
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404, {'Content-Type': 'text/plain'}); return res.end('Not found'); }
-    res.writeHead(200, {'Content-Type': type, 'Cache-Control': cache, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin'});
+    res.writeHead(200, {'Content-Type': type, 'Cache-Control': cache, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', ...extra});
     res.end(buf);
   });
 }
@@ -697,9 +744,12 @@ const TYPES = {jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', svg: 'im
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
-  res.setHeader('Access-Control-Allow-Origin', C.CORS_ORIGIN);
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Key');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (C.CORS_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', C.CORS_ORIGIN); res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   try {
     if (p.startsWith('/api/')) {
@@ -716,16 +766,18 @@ const server = http.createServer(async (req, res) => {
     if (p.startsWith('/photos/')) {
       const name = p.slice(8);
       if (!/^[\w-]+\.(jpg|png|webp|svg)$/.test(name)) bad('Not found.', 404);
-      return serveFile(res, path.join(PHOTO_DIR, name), TYPES[name.split('.').pop()], 'public, max-age=86400');
+      return serveFile(res, path.join(PHOTO_DIR, name), TYPES[name.split('.').pop()], 'public, max-age=86400', PHOTO_HEADERS);
     }
-    if (p === '/admin') return serveFile(res, path.join(PUBLIC, 'admin.html'), 'text/html; charset=utf-8', 'no-store');
+    if (p === '/admin') return serveFile(res, path.join(PUBLIC, 'admin.html'), 'text/html; charset=utf-8', 'no-store', {...PAGE_HEADERS, 'X-Robots-Tag': 'noindex'});
     if (p === '/favicon.ico') { res.writeHead(204); return res.end(); }
-    return serveFile(res, path.join(PUBLIC, 'index.html'), 'text/html; charset=utf-8', 'no-cache');
+    return serveFile(res, path.join(PUBLIC, 'index.html'), 'text/html; charset=utf-8', 'no-cache', PAGE_HEADERS);
   } catch (e) {
     if (e instanceof HttpError) return send(res, e.status, {message: e.message, ...(e.code ? {code: e.code} : {})});
     console.error('[error]', req.method, p, e);
     return send(res, 500, {message: 'Something went wrong on our side. Try again.'});
   }
 });
+server.requestTimeout = 30e3; server.headersTimeout = 20e3; server.keepAliveTimeout = 5e3; // don't let slow or stuck connections pile up
+setInterval(() => { q('DELETE FROM sessions WHERE created_at < ?').run(now() - C.SESSION_DAYS * 86400e3); }, 3600e3).unref();
 if (require.main === module) server.listen(C.PORT, () => console.log(`Dandiya Nights running on :${C.PORT} (${PROD ? 'production' : 'dev'}) · data in ${C.DATA_DIR}`));
 module.exports = {server, db, C};
