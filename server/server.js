@@ -1,5 +1,5 @@
 /*
- * Stick Together · Picapool Dandiya match · reference backend
+ * Dandiya Nights (built on Stick Together) · Picapool Navratri app · reference backend
  * Zero dependencies. Node 22.13+ (uses built-in node:sqlite).
  * Serves the page (public/index.html), the API (/api/*), photos (/photos/*) and a small admin page (/admin).
  * Connect Picapool in integrations.js. Configure with env vars (see HANDOFF.md §3).
@@ -613,7 +613,9 @@ route('GET', '/api/admin/summary', ({req, url}) => {
       linkedToPicapool: n('SELECT COUNT(*) n FROM users WHERE picapool_id IS NOT NULL'), perDay},
     profiles: {total: n('SELECT COUNT(*) n FROM profiles'), hidden: n('SELECT COUNT(*) n FROM profiles WHERE hidden=1'),
       byGender: q('SELECT u.gender, COUNT(*) n FROM profiles p JOIN users u ON u.id=p.user_id GROUP BY u.gender').all(),
-      inBoard: n('SELECT COUNT(*) n FROM profiles WHERE in_board=1')},
+      inBoard: n('SELECT COUNT(*) n FROM profiles WHERE in_board=1'),
+      noPhoto: n(`SELECT COUNT(*) n FROM profiles WHERE json_array_length(data,'$.photos')=0`),
+      paused: n(`SELECT COUNT(*) n FROM profiles WHERE COALESCE(json_extract(data,'$.paused'),0)=1`)},
     swipes: {total: n('SELECT COUNT(*) n FROM swipes'), right: n(`SELECT COUNT(*) n FROM swipes WHERE dir='right'`)},
     matches: {total: n('SELECT COUNT(*) n FROM matches'), chats: n('SELECT COUNT(*) n FROM matches WHERE chat_id IS NOT NULL'),
       numbersShared: n('SELECT COUNT(*) n FROM matches WHERE a_share=1 AND b_share=1')},
@@ -717,5 +719,5 @@ const server = http.createServer(async (req, res) => {
     return send(res, 500, {message: 'Something went wrong on our side. Try again.'});
   }
 });
-if (require.main === module) server.listen(C.PORT, () => console.log(`Stick Together running on :${C.PORT} (${PROD ? 'production' : 'dev'}) · data in ${C.DATA_DIR}`));
+if (require.main === module) server.listen(C.PORT, () => console.log(`Dandiya Nights running on :${C.PORT} (${PROD ? 'production' : 'dev'}) · data in ${C.DATA_DIR}`));
 module.exports = {server, db, C};

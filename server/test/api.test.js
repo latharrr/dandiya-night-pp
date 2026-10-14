@@ -158,7 +158,7 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   ok((await j('GET', '/matches', null, g)).o.matches.length === 0, 'reported/blocked match disappears');
   const ev = await fetch(B + '/events', {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({event: 'landing_view', sessionId: 's9811111111', ref: 'x'})}); ok(ev.status === 204, 'event beacon (text/plain)');
   ok((await j('GET', '/admin/summary')).s === 403, 'admin needs key');
-  const ad = await fetch(B + '/admin/summary', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(ad.accounts.completed === 5 && ad.identityConflicts === 0 && ad.topRefs[0].ref === 'shraddha' && ad.matches.chats === 1, 'admin summary: accounts, refs, chats');
+  const ad = await fetch(B + '/admin/summary', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(ad.accounts.completed === 5 && ad.identityConflicts === 0 && ad.topRefs[0].ref === 'shraddha' && ad.matches.chats === 1 && ad.profiles.noPhoto === 0 && ad.profiles.paused === 0, 'admin summary: accounts, refs, chats, photo-less and paused passes');
   ok((await j('DELETE', '/profile', null, b)).s === 200, 'delete profile');
   ok((await j('GET', '/feed', null, b)).s === 409, 'feed needs profile after delete');
   const kidPhotoGone = await fetch(ORIGIN + '/photos/' + 'nope.jpg'); ok(kidPhotoGone.status === 404, '404 on missing photo');

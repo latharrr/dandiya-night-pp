@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Stick Together Admin</title>
+<title>Dandiya Nights Admin</title>
 <style>
 :root{--ink:#1B1410;--muted:#6B5D54;--cream:#FFF6EC;--orange:#FF6B22;--soft:#FFE4D1;--red:#D92D39}
 *{box-sizing:border-box}
@@ -33,7 +33,7 @@ button.ghost{background:#fff;color:var(--ink)}
 </head>
 <body>
 <main>
-  <div class="row"><h1>Stick Together · Admin</h1></div>
+  <div class="row"><h1>Dandiya Nights · Admin</h1></div>
   <section class="row"><label for="key">Admin key</label><input id="key" type="password" autocomplete="off"><button id="load">Load</button><span class="err" id="err"></span></section>
   <section><h2>Numbers</h2><div class="kpis" id="kpis"><span class="muted">Enter the key and press Load.</span></div></section>
   <section><h2>Top 20 check (before posting the nightly board)</h2>
@@ -65,8 +65,8 @@ async function load() {
     const k = (n, l) => `<div class="kpi"><b>${n}</b><span>${l}</span></div>`;
     const g = Object.fromEntries(s.profiles.byGender.map(r => [r.gender, r.n]));
     $('#kpis').innerHTML = k(s.accounts.completed, 'accounts created') + k(s.accounts.perDay[0]?.day === s.today ? s.accounts.perDay[0].n : 0, 'accounts today')
-      + k(s.profiles.total, 'Dandiya cards') + k(`${g.female || 0} / ${g.male || 0}`, 'girls / guys') + k(s.swipes.right, 'right swipes')
-      + k(s.matches.total, 'matches') + k(s.matches.chats, 'chats opened') + k(s.matches.numbersShared, 'numbers shared')
+      + k(s.profiles.total, 'Dandiya passes') + k(s.profiles.noPhoto, 'passes without a photo (hidden)') + k(s.profiles.paused, 'paused') + k(`${g.female || 0} / ${g.male || 0}`, 'girls / guys') + k(s.swipes.right, 'pair-up picks')
+      + k(s.matches.total, 'pairs') + k(s.matches.chats, 'chats opened') + k(s.matches.numbersShared, 'numbers shared')
       + k(s.reportsPending, 'reported profiles') + k(s.ageBlocks, 'under-18 blocked')
       + k(s.messageRequestsWaiting, 'message requests waiting') + k(s.identityConflicts, 'Picapool clashes');
     const cf = await api('/conflicts');

@@ -1,8 +1,8 @@
 {
-  "name": "picapool-stick-together",
+  "name": "picapool-dandiya-nights",
   "version": "1.0.0",
   "private": true,
-  "description": "Picapool Navratri Dandiya partner match: page + API in one Node server. No dependencies.",
+  "description": "Picapool Dandiya Nights (Navratri 2026, North Campus): page + API in one Node server. No dependencies.",
   "main": "server.js",
   "engines": {
     "node": ">=22.13"

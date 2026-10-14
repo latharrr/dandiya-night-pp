@@ -39,7 +39,7 @@ for (const gender of ['female', 'male']) for (let i = 0; i < N; i++) {
   const file = `${id}-seed.svg`; fs.writeFileSync(path.join(PHOTO_DIR, file), svg);
   const nights = up.filter(() => Math.random() < 0.5); if (!nights.length) nights.push(pick(up));
   const ride = pick(['own','cab','metro','need']);
-  const data = {photos: [`${C.PUBLIC_URL}/photos/${file}`], nights, venue: pick(['Main North Campus event','College garba','Society / PG garba','Still deciding']),
+  const data = {photos: [`${C.PUBLIC_URL}/photos/${file}`], nights, venue: pick(['Main North Campus event','College garba','Society / PG garba',null]),
     lookingFor: pick(['one','every']), skill: pick(['learning','hold','main']), style: pick(['garba','dandiya','both']), sticks: pick(['have','spare','need']),
     outfit: pick(['night','own','match']), knuckle: pick(['tap','click','breaker']), prompt: {id: 'flag', text: 'Test profile'}, ride, seats: ride === 'own' ? 1 : 0,
     rideConsent: false, inBoard: Math.random() < 0.8};
