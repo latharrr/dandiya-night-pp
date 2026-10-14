@@ -2,7 +2,7 @@
 Writes: ../server/public/index.html (live), ../demo.html (demo) when run from the handoff's source/ folder,
 or out/... when run in the working folder."""
 import re, os, base64
-BUILD = '2026-10-15-v2'
+BUILD = '2026-10-15-v2.1'
 here = os.path.dirname(os.path.abspath(__file__))
 def first(*cands):
     for c in cands:

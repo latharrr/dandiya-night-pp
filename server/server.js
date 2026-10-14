@@ -30,7 +30,7 @@ const C = {
   CORS_ORIGIN: ENV.CORS_ORIGIN || '*',
   PUBLIC_URL: (ENV.PUBLIC_URL || '').replace(/\/$/, ''),
   REPORT_HIDE: +(ENV.REPORT_HIDE || 3),
-  LB_REFRESH_MS: +(ENV.LB_REFRESH_MS ?? 60e3), // leaderboard is recomputed at most once a minute
+  LB_REFRESH_MS: +(ENV.LB_REFRESH_MS ?? 15e3), // leaderboard is recomputed at most every 15 s; the page refreshes an open board every 15 s
   STATS_REFRESH_MS: +(ENV.STATS_REFRESH_MS || 5 * 60e3),
   TRUST_PROXY: ENV.TRUST_PROXY === '1',
   DEV_OTP: PROD ? null : (ENV.DEV_OTP || null),
@@ -517,6 +517,14 @@ function rankBoard(gender, period) {
       WHERE s.dir='right' ${period === 'tonight' ? 'AND s.day=?' : ''}
       GROUP BY s.to_id ORDER BY n DESC, MIN(s.at) ASC LIMIT ${C.BOARD_SIZE}`).all(...(period === 'tonight' ? [gender, istDay()] : [gender]));
   const out = rows.map(r => { const uu = q('SELECT * FROM users WHERE id=?').get(r.id), p = profileOf(r.id); return {id: r.id, name: uu.first_name, college: uu.college, photo: p.photos[0], count: r.n}; });
+  /* v2: the board always shows up to BOARD_SIZE people a side. After the people picked tonight (or this Navratri) come the rest of the race,
+     most-picked this Navratri first, then earliest pass. They have count 0: they never get a rank or a crown. */
+  if (out.length < C.BOARD_SIZE) {
+    const have = new Set(out.map(r => r.id));
+    const rest = q(`SELECT u.id, u.first_name, u.college, p.data, p.created_at, (SELECT COUNT(*) FROM swipes s JOIN profiles pf ON pf.user_id=s.from_id AND pf.hidden=0 WHERE s.to_id=u.id AND s.dir='right') week
+        FROM profiles p JOIN users u ON u.id=p.user_id WHERE p.in_board=1 AND ${VISIBLE('p')} AND u.gender=? ORDER BY week DESC, p.created_at ASC LIMIT ${C.BOARD_SIZE * 2}`).all(gender);
+    for (const r of rest) { if (out.length >= C.BOARD_SIZE) break; if (have.has(r.id)) continue; out.push({id: r.id, name: r.first_name, college: r.college, photo: JSON.parse(r.data).photos[0], count: 0}); }
+  }
   lbCache[key] = {at: now(), rows: out};
   return out;
 }
@@ -533,7 +541,7 @@ route('GET', '/api/leaderboard', ({req, url}) => {
       const count = q(`SELECT COUNT(*) n FROM swipes s JOIN profiles pf ON pf.user_id=s.from_id AND pf.hidden=0 WHERE s.to_id=? AND s.dir='right' ${period === 'tonight' ? 'AND s.day=?' : ''}`)
         .get(...(period === 'tonight' ? [u.id, istDay()] : [u.id])).n;
       const i = top.findIndex(r => r.id === u.id);
-      me = {count, rank: i >= 0 ? i + 1 : null};
+      me = {count, rank: i >= 0 && top[i].count > 0 ? i + 1 : null}; // only people who were actually picked get a rank and a crown
     }
   }
   return {top: top.map(({count, ...r}) => ({...r, ...(u && r.id === u.id ? {isMe: true} : {})})), me};

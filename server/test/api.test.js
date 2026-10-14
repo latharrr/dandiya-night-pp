@@ -167,6 +167,15 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   const page = await fetch(ORIGIN + '/shraddha'); const html = await page.text(); ok(page.status === 200 && html.includes("MODE: 'live'"), 'slug path serves live page');
   ok((await fetch(ORIGIN + '/admin')).status === 200, 'admin page served');
   ok((await j('GET', '/nope')).s === 404, 'unknown api 404');
+  // v2: the board fills up to 20 a side with people in the race who haven't been picked yet; they never get a rank
+  { for (let i = 0; i < 18; i++) { const id = 'u_bf' + i; sql(`INSERT INTO users(id, phone, first_name, gender, college, adult, created_at) VALUES(?,?,?,?,?,1,?)`, id, '52000000' + String(i).padStart(2, '0'), 'Fill' + i, 'female', 'Hindu College', Date.now());
+      sql(`INSERT INTO profiles(user_id, data, in_board, hidden, created_at, updated_at) VALUES(?,?,1,0,?,?)`, id, JSON.stringify({photos: ['/photos/x.jpg'], nights: ['d6'], inBoard: true}), Date.now() + i, Date.now()); }
+    sql(`INSERT INTO users(id, phone, first_name, gender, college, adult, created_at) VALUES('u_bfnp','5200000099','NoPhoto','female','Hindu College',1,?)`, Date.now());
+    sql(`INSERT INTO profiles(user_id, data, in_board, hidden, created_at, updated_at) VALUES('u_bfnp',?,1,0,?,?)`, JSON.stringify({photos: [], nights: ['d6'], inBoard: true}), Date.now(), Date.now());
+    const bf = await j('GET', '/leaderboard?board=queen&period=tonight'); ok(bf.o.top.length === 18 && bf.o.top[0].name === 'Fill0', 'board fills with people in the race (' + bf.o.top.length + '), earliest pass first');
+    ok(!bf.o.top.some(r => r.name === 'NoPhoto'), 'photo-less passes never on the board');
+    for (let i = 0; i < 18; i++) { sql('DELETE FROM profiles WHERE user_id=?', 'u_bf' + i); sql('DELETE FROM users WHERE id=?', 'u_bf' + i); }
+    sql("DELETE FROM profiles WHERE user_id='u_bfnp'"); sql("DELETE FROM users WHERE id='u_bfnp'"); }
   // sample people fill the guest peek (a second server with SAMPLE_PROFILES on, fresh data)
   { const P2 = PORT + 600, D2 = fs.mkdtempSync(path.join(os.tmpdir(), 'st-test-s-'));
     const s2 = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {env: {...process.env, NODE_ENV: 'test', DEV_OTP: '1234', PORT: String(P2), DATA_DIR: D2}, stdio: 'ignore'});

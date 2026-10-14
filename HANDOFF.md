@@ -1,7 +1,7 @@
 # Dandiya Nights: Tech Handoff
 Picapool's Navratri app for North Campus. People see who's going to garba on their nights, pair up, and chat or swap numbers on Picapool. Guests can peek at tonight's top 5 before signing up; the picks they make there are sent once they make their pass.
 
-Build `2026-10-15-v2` · 15 Oct 2026 · Built on Stick Together build k (same server, same Picapool sync), with the approved v2 design and flow.
+Build `2026-10-15-v2.1` · 15 Oct 2026 (v2.1: team feedback round 1) · Built on Stick Together build k (same server, same Picapool sync), with the approved v2 design and flow.
 
 ## What you've got (3 files)
 | File | What it is |
@@ -12,7 +12,7 @@ Build `2026-10-15-v2` · 15 Oct 2026 · Built on Stick Together build k (same se
 
 ```bash
 node 2-dandiya-nights-code.js          # → ./dandiya-nights/
-cd dandiya-nights/server && npm test   # 137 checks, ends with "ALL CHECKS PASSED"
+cd dandiya-nights/server && npm test   # 139 checks, ends with "ALL CHECKS PASSED"
 ```
 
 ## 0. Do this (Picapool tech team)
@@ -53,6 +53,15 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 - **Log in for returning people** goes code → straight to Discover.
 - Words: like → **pick / pair up**, match → **paired**, Matches → **Pairs** (Paired · Picked you · You picked), card → **pass**, Me → **Profile**.
 
+**v2.1 (team feedback, 15 Oct)**
+- **Code and birthday boxes can never be wider than the screen** (fixes the sideways scrolling on the code screen in Safari). Code check verified end to end: wrong code → "That code isn't right…" and the boxes clear; resend is held for 30 s; a pasted or auto-filled code checks itself.
+- **Story sharing everywhere a pass or crown is shared** (Profile → Share my Dandiya pass, Profile ⤴, Flaunt your crown on Discover, Board and Profile, and "Post my pass to my story" in the invite sheet). A 1080×1920 story image opens first, with **Share to Instagram story** and **Share to WhatsApp status** (the phone's share sheet; the invite link is copied for the Instagram Link sticker). Where a browser can't share files: **Save image**, or long-press. No photo yet → "Add a photo for your story" → photos → straight back to the story.
+- **Live boards with at least 15 a side:** each board shows up to 20 people. After everyone who was picked come the rest of the race (most-picked this Navratri, then earliest pass), so it's full from day one. Only people who were actually picked get a rank or a crown. An open board refreshes every 15 s and shows ▲ / ▼ / new next to names that moved; the server recomputes every 15 s (`LB_REFRESH_MS`).
+- **Photo upload is asked for, not just offered:** the photo sheet opens on the first arrival in Discover, and once more after the first swipe if they tapped Later; the "Add a photo" bar stays until there is one. The sheet shows "3 of 5 photos" and stops at 5 ("That's the most you can add"; extra picks are left out with a note).
+- **"Add a line" after 5 swipes** now shows for everyone without a line (it used to wait for a photo).
+- **Review skipped profiles:** at the end of the deck, a main button "Review skipped profiles" (when there are any). Picking someone there changes the decision; the rest stay skipped. A "Reviewing skipped profiles · Done" bar shows while reviewing.
+- Demo and samples now use 15 young Indian adults a side (Unsplash licence); replace before launch (§0 step 10).
+
 **Server**: photo-optional passes, `VISIBLE` rule (not hidden, has a photo, not paused) on every list, clear photo + `count` + samples in `/api/preview`, `/api/profile/pause`, admin counts for passes without a photo and paused passes. 24 new checks (137 in total).
 
 ## 1. Folder (after unpacking)
@@ -63,7 +72,7 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 | `server/samples.json` | Sample people for the guest peek (replace the photos, §0 step 10) |
 | `server/public/index.html` | The page, already in live mode. Mobile-first, full screen on phones, a centred column on laptops |
 | `server/public/admin.html` | `/admin`: numbers, nightly top-20 check, reports, Picapool clashes, hide/unhide |
-| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 137 checks. Never touches real data |
+| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 139 checks. Never touches real data |
 | `server/seed.js` · `export.js` · `Dockerfile` | Fake test profiles (`npm run seed:test` / `seed:remove`) · CSV of accounts (`npm run export`) · Docker |
 | `demo.html` | Same as `3-demo.html` |
 | `source/` | `template.html` (the one source for the page), `build.py`, logo files, `fonts/` (DM Serif Display + Figtree, SIL Open Font License). After a change: `python3 source/build.py` rewrites `server/public/index.html` and `demo.html` |
@@ -73,7 +82,7 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 ## 2. Run locally
 ```bash
 cd server
-npm test                 # 137 checks
+npm test                 # 139 checks
 npm run seed:test        # 20 fake girls + 20 fake guys (phones start with 5)
 npm run dev              # http://localhost:8080 · login code is always 1234 · codes print in the log
 ```
@@ -101,7 +110,7 @@ HTTPS on `dandiya.picapool.tech` via nginx or Caddy. **One instance only** (SQLi
 | `OTP_LENGTH` | `4` | Keep equal to `CONFIG.OTP_LENGTH` |
 | `DELETE_ON` | `2026-10-20` | Date (IST) all Dandiya data is deleted |
 | `REPORT_HIDE` | `3` | Reports that hide a pass until an admin reviews it |
-| `LB_REFRESH_MS` | `60000` | How often the board (and the guest top 5) is recomputed |
+| `LB_REFRESH_MS` | `15000` | How often the board (and the guest top 5) is recomputed. The page refreshes an open board every 15 s |
 | `SAMPLE_PROFILES` | on | **New.** `0` = never fill the guest peek with sample people |
 | `SHOW_COUNTS` | on | **New.** `0` = never send "how many are going" counts (§0 step 11) |
 | `COUNT_MIN` | `20` | **New.** Below this many people the count isn't sent; the page shows the line without a number |
@@ -187,17 +196,17 @@ Don't change `MODE` (`'live'`) or `API_BASE` (`'/api'`).
 8. **College** (search + tap; "Other college" + type it). Saves the account.
 9. **Nights** (+ "Every night", optional "Where, mostly?"), Terms/Privacy line, "Agree and see who's going". Makes the pass and sends the held picks.
 10. **Reveal (night):** "26 girls are going *on your nights.*" If a held pick already picked them back: "Kavya picked you too, so you're already paired" → "Say hi to Kavya".
-11. **Discover:** My nights / All nights, add-photo prompt, crown bar, card (photos, college, nights with shared ones highlighted, where, line, ⋯ report), skip / pair up bar. First swipe → photo sheet (once). Fifth swipe → "add a line" sheet (once). 40 picks → daily limit sheet. End of deck → invite, all nights, look at people you skipped.
+11. **Discover:** My nights / All nights, add-photo bar, crown bar, card (photos, college, nights with shared ones highlighted, where, line, ⋯ report), skip / pair up bar. Arrival → photo sheet; first swipe → photo sheet again if skipped. Fifth swipe → "add a line" sheet (once). 40 picks → daily limit sheet. End of deck → **Review skipped profiles**, invite, all nights.
 12. **Paired (night overlay):** "You and Kavya *are paired.*" → Say hi / Swap numbers / Keep exploring.
 13. **Pairs:** Paired · Picked you · You picked (§9).
-14. **Board:** Garba Queen / Garba King, tonight / all of Navratri, podium + list, "You're #3 · 4 people picked you today. Only you see this", Flaunt your crown.
+14. **Board (live):** Garba Queen / Garba King, tonight / all of Navratri, podium + list of up to 20 a side, ▲/▼ for who moved, "Live · updated 9:41 pm", "You're #3 · 4 people picked you today. Only you see this", Flaunt your crown.
 15. **Profile ("Your pass"):** photo, name, college, nights, where; Share my Dandiya pass; Photos (up to 5, make main), Nights and where, College, Your line; In the race; **Pause my pass**; Delete; Log out.
 
 ## 7. API (JSON; errors are `{message, code?}` written for the user)
 | Method, path | Auth | Purpose |
 |---|---|---|
 | `GET /api/preview?gender=female\|male&nights=d5,d6` | public | **Changed.** Guest peek and sign-up crowd: tonight's top 5 (board order, then a daily shuffle), then samples. `{profiles: [{id, name, college, nights, prompt, photo, sample?}], count}`. Never phones or venues. `count` = real visible people on those nights, or `null` (§3). Cached 2 min |
-| `GET /api/leaderboard?board=queen\|king&period=tonight\|week` | optional | Top 20 per board: name, college, photo. With a token adds `me: {count, rank}` (private) |
+| `GET /api/leaderboard?board=queen\|king&period=tonight\|week` | optional | **Changed.** Up to 20 per board: picked people first, then the rest of the race. Name, college, photo. With a token adds `me: {count, rank}` (private; `rank` only if picked) |
 | `POST /api/auth/otp` `{phone}` · `POST /api/auth/verify` `{phone, code, ref, entry, sessionId}` | public | Codes: 30 s cooldown, 5/hour per phone, 5 tries, 10 min expiry → `{token, user, profile}` |
 | `POST /api/picapool/lookup` | token | → `{status: 'found'\|'not_found'\|'unavailable', user, synced?}` |
 | `POST /api/integrations/picapool-user` | `X-Picapool-Secret` | Picapool's push (§4b) |
@@ -219,8 +228,9 @@ Don't change `MODE` (`'live'`) or `API_BASE` (`'/api'`).
 
 ## 8. Crowns and sharing
 - New passes are in the Garba Queen/King race automatically (Profile switch to leave). Top 20 per side, tonight and all of Navratri; no public counts. A pass needs a photo to be crowned.
-- Anyone in tonight's top 20 sees a gold "#3 Garba King tonight · Flaunt it" bar on Discover, a gold dot on Board, and "Flaunt your crown" on Board and Profile. It builds a 1080×1920 story poster in the new look (wine night, lights in the nine colours, photo in an arch, DM Serif). Its sheet: **Post to story** (or **Save image**) · **Send on WhatsApp** · **Copy link**.
-- The invite sheet (Discover ⤴, Profile, end of the deck) leads with the **invite link** (`?ref=st-…`, attributed in `/admin`): Share / Copy invite link, WhatsApp, then "Or post a story" with the "Going to garba on these nights" poster (needs a photo).
+- Anyone picked into tonight's top 20 sees a gold "#3 Garba King tonight · Flaunt it" bar on Discover, a gold dot on Board, and "Flaunt your crown" on Board and Profile.
+- **Story sheet** (crowns and "Share my Dandiya pass"): a 1080×1920 image in the new look (wine night, lights in the nine colours, photo in an arch, DM Serif) opens first → **Share to Instagram story** · **Share to WhatsApp status** (or **Save image**), then **Send on WhatsApp** and **Copy link**.
+- The invite sheet (Discover ⤴, end of the deck) leads with the **invite link** (`?ref=st-…`, attributed in `/admin`): Share / Copy invite link, WhatsApp, then "Post my pass to my story".
 
 ## 9. Pairs: three tabs, and every chat state
 **Paired** (default) · **Picked you** (they picked me; Pair up / Not for me; "You skipped them earlier") · **You picked** (waiting). ⋯ on every row: report or block. A line on Paired: 🔒 "Your number stays private on Picapool chat."
@@ -274,7 +284,10 @@ On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 - [ ] Not on Picapool → "One small step…" → sign up → "I've signed up" finds you. Other not on Picapool → "…is reviewing your message request" → they get the WhatsApp → they sign up → the chat appears for both
 - [ ] Swap numbers → numbers only after both agree
 - [ ] ⋯ → report → the person is gone from Discover and Pairs. Pause → gone from the other side's Discover; resume → back
-- [ ] 40 picks → daily limit sheet. Invite link first in Share; `?ref=` attributed in `/admin`. Crown → poster → story and WhatsApp
+- [ ] 40 picks → daily limit sheet. Invite link first in the invite sheet; `?ref=` attributed in `/admin`
+- [ ] Share my Dandiya pass and Flaunt your crown → the story image opens → Share to Instagram story lands in IG's story editor; Share to WhatsApp status lands in WhatsApp → My status. In WhatsApp's in-app browser: Save image / long-press works
+- [ ] Board open on two phones; pick someone on one → within ~15 s the other shows them move (▲)
+- [ ] End of the deck → Review skipped profiles → pick one → they leave the review deck and show in "You picked"
 - [ ] Under-18 birthday → "18+ only". `/admin` shows the test accounts; delete the test passes. Don't seed production
 
 **Cold start:** samples cover the guest peek, but aim for 30+ real passes per side before the public push, girls first. No fake people in the feed, ever.
@@ -302,4 +315,5 @@ On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 | v2 | Design modelled on the structure of Play Garba (playgarba.in): wine night for sign-up, cream app, one question per card with an italic second line, tap-to-continue rows, live crowd above the question, reveal before the app, photo after the first swipe. Picapool's own brand, illustration and copy | Deepanshu, 14 Oct |
 | v2 | No progress bar | Deepanshu, 14 Oct |
 | v2 | Gaps filled: report/block on every card and pair, pause, "Where, mostly?", garba plan in Say hi, WhatsApp-alert line on the reveal, daily limit sheet, look at people you skipped, crown poster kept, log in goes straight to Discover | Deepanshu, 14 Oct |
+| v2.1 | Team feedback round 1: code-screen scroll fix, story sharing restored, live boards with 15+ a side, photo upload prompted, line prompt after 5 swipes, review skipped profiles. Design changes for screens 2–4 and Krish's cosmetic changes still to come | Team, 15 Oct |
 | v2 | **Counts on** (sign-up crowd and reveal), behind `SHOW_COUNTS` and `COUNT_MIN`. Overrides build k's "no counts" rule; **Purav to confirm** | Deepanshu, 14 Oct; Purav to confirm |

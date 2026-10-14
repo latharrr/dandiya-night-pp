@@ -102,7 +102,7 @@ img{display:block}
 .live b{font-family:var(--serif);font-weight:400;font-size:18px;color:var(--marigold);font-variant-numeric:tabular-nums}
 .live i{width:8px;height:8px;border-radius:50%;background:#4ADE80}
 @media (max-height:640px){ .faces{display:none} .crowd{min-height:60px} }
-.card{background:var(--paper);border-radius:28px 28px 0 0;padding:14px 22px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -20px 60px rgba(0,0,0,.35);max-height:78%;overflow-y:auto;scrollbar-width:none;flex-shrink:0;animation:rise .5s var(--ease) both}
+.card{overflow-x:hidden;touch-action:pan-y;background:var(--paper);border-radius:28px 28px 0 0;padding:14px 22px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -20px 60px rgba(0,0,0,.35);max-height:78%;overflow-y:auto;scrollbar-width:none;flex-shrink:0;animation:rise .5s var(--ease) both}
 .card::-webkit-scrollbar{display:none}
 @keyframes rise{from{transform:translateY(24px);opacity:.4}}
 .card-top{display:flex;align-items:center;justify-content:space-between;min-height:40px;margin-bottom:6px}
@@ -136,12 +136,13 @@ img{display:block}
 .phone span{padding:0 12px 0 16px;font-size:17px;font-weight:600;color:var(--ink-2);border-right:1.5px solid var(--line);height:26px;display:flex;align-items:center}
 .phone input{flex:1;min-width:0;height:100%;border:0;outline:0;background:none;padding:0 14px;font-size:17px;letter-spacing:.03em}
 .phone input::placeholder{color:#958379}
-.otp{display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:10px}
-.otp input{height:64px;width:100%;border-radius:14px;border:1.5px solid var(--line);background:#fff;text-align:center;font-family:var(--serif);font-size:28px;color:var(--wine);outline:none;transition:all .2s}
+.otp{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:10px;width:100%}
+.otp input{height:64px;width:100%;min-width:0;border-radius:14px;border:1.5px solid var(--line);background:#fff;text-align:center;font-family:var(--serif);font-size:28px;color:var(--wine);outline:none;transition:all .2s}
 .otp input:focus{border-color:var(--wine)}
 .otp.ok input{border-color:var(--ok);background:#F1FAF4}
-.dob{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px}
-.dob .field{text-align:center;padding:0 8px}
+.dob{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr);gap:10px;width:100%}
+.dob .field{text-align:center;padding:0 8px;min-width:0}
+.field,.phone input{min-width:0}
 .age{min-height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:6px 0}
 .age b{font-family:var(--serif);font-weight:400;font-size:52px;line-height:1;color:var(--wine);animation:pop .4s cubic-bezier(.2,1.6,.4,1)}
 @keyframes pop{from{transform:scale(.6);opacity:0}}
@@ -273,6 +274,9 @@ img{display:block}
 .rk img{width:42px;height:42px;border-radius:50%;object-fit:cover}
 .rk b{display:block;font-size:15px;font-weight:600}
 .rk small{color:var(--muted);font-size:12.5px}
+.mv{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 5px;border-radius:5px;margin-left:4px;vertical-align:2px}
+.mv.up{color:#1E6B3F;background:#E3F3E9}.mv.down{color:#9B2C22;background:#FBE7E5}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#2F9E62;margin-right:6px;vertical-align:1px}
 .rk .you{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--wine);background:#FBEDEF;border-radius:6px;padding:3px 7px}
 .mine{margin-top:16px;padding:16px;border-radius:16px;background:var(--paper);border:1px solid #EBD3A6}
 .mine b{font-family:var(--serif);font-weight:400;font-size:20px;color:var(--wine)}
@@ -343,6 +347,11 @@ img{display:block}
 .slot .tag2{position:absolute;left:6px;bottom:6px;min-height:24px;padding:0 8px;border-radius:7px;background:var(--paper);color:var(--wine);font-size:11.5px;font-weight:700;display:flex;align-items:center;z-index:2}
 .slot button.tag2{cursor:pointer}
 .file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.story{margin:4px auto 14px;width:min(62%,260px);aspect-ratio:9/16;border-radius:16px;overflow:hidden;background:#38121F;box-shadow:0 12px 34px rgba(30,10,22,.28);display:grid;place-items:center}
+.story img{width:100%;height:100%;object-fit:cover}
+.story .spinner{border-color:rgba(255,244,232,.2);border-top-color:#F2B25C}
+@media (max-height:720px){ .story{width:min(48%,210px)} }
+.btn.ig{background:linear-gradient(120deg,#F58529,#DD2A7B 55%,#8134AF);color:#fff}
 .poster{width:62%;max-width:240px;border-radius:14px;margin:4px auto 14px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
 .linkbox{background:#F4EAE1;border-radius:12px;padding:12px;margin:0 0 12px;font-size:14px;font-weight:600;color:var(--ink);word-break:break-all}
 .sharetext{background:#F4EAE1;border-radius:12px;padding:12px;margin:0 0 12px;font-size:14px;word-break:break-all;user-select:all;-webkit-user-select:all}
@@ -474,7 +483,7 @@ const freshState = () => ({
   guest: null,        // before signing up: {firstName, gender, likes, seenIds, done, pool, gated}
   swipes: {}, rightsByDay: {}, matches: [], blocked: [], seenMatchIds: [], ageBlocked: false, crown: null, crownHidden: null, loginOnly: false,
   picapool: null,     // result of the Picapool account lookup after OTP: 'found' | 'not_found' | 'unavailable'
-  feedSwipes: 0, lineAsked: false, photoAsked: false,
+  feedSwipes: 0, lineAsked: false, photoAsked: false, photoAsked2: false,
 });
 let S = Object.assign(freshState(), store.get(KEY, {}));
 const save = () => store.set(KEY, S);
@@ -550,14 +559,20 @@ class LiveApi {
 /* ---- demo backend: sample people, all in this browser ---- */
 const UNSPLASH = id => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=720&h=960&q=72`;
 const DEMO_PEOPLE = {
-  female: [['Ananya', '1617627143750-d86bc21e42bb', 'flag', 'Here for the dhol. Staying for the garba.'], ['Ishita', '1610030469983-98e550d6193c', 'teach', 'one new step, and we’re even'],
-    ['Kavya', '1534528741775-53994a69daeb', 'anthem', 'Chogada Tara'], ['Riya', '1544005313-94ddf0286df2', null, ''], ['Simran', '1524504388940-b1c1722653e1', 'flag', 'Brings her own sticks'],
-    ['Meher', '1607746882042-944635dfe10e', 'find', 'dhol'], ['Tanvi', '1494790108377-be9c29b29330', 'anthem', 'Pankhida']],
-  male: [['Aditya', '1507003211169-0a1dd7228f2d', 'flag', 'Shows up on time'], ['Kabir', '1566492031773-4f4e44671857', 'anthem', 'Nagada Sang Dhol'],
-    ['Arjun', '1603415526960-f7e0328c63b1', 'teach', 'the 3-clap step'], ['Rohan', '1506794778202-cad84cf45f1d', null, ''], ['Nikhil', '1596075780750-81249df16d19', 'find', 'food stalls'],
-    ['Vivaan', '1539571696357-5a69c17a67c6', 'flag', 'Dances even to the slow songs'], ['Dev', '1500648767791-00dcc994a43e', 'anthem', 'Dholida']],
+  female: [['Ananya', '1617627143750-d86bc21e42bb', 'flag', 'Here for the dhol. Staying for the garba.'], ['Ishita', '1706943262473-fc393f495501', 'teach', 'one new step, and we’re even'],
+    ['Kavya', '1708182564325-fb1d3a3864d3', 'anthem', 'Chogada Tara'], ['Riya', '1624610806209-82a4cbb4339a', null, ''], ['Simran', '1739429942851-9083ee185d3d', 'flag', 'Brings her own sticks'],
+    ['Meher', '1708534246051-7f47b279e94b', 'find', 'dhol'], ['Tanvi', '1693023656257-87c142566ad3', 'anthem', 'Pankhida'], ['Aditi', '1716504628204-47f2df8d2634', 'teach', 'the 3-clap step'],
+    ['Sneha', '1764740185240-58527413f572', 'flag', 'Shows up on time'], ['Diya', '1614951649373-32cc2e957fdd', 'find', 'photo booth'], ['Khushi', '1617297873650-aef8f4e00b9b', 'anthem', 'Udi Udi Jaye'],
+    ['Nandini', '1628620835051-8f40f48c928d', null, ''], ['Pooja', '1678855904567-d9e73fa2e01d', 'flag', 'Dances even to the slow songs'], ['Avni', '1677339276374-28460a1c2218', 'find', 'food stalls'],
+    ['Saanvi', '1610030469983-98e550d6193c', 'teach', 'Garba in 10 minutes']],
+  male: [['Aditya', '1729157661483-ed21901ed892', 'flag', 'Shows up on time'], ['Kabir', '1589386417686-0d34b5903d23', 'anthem', 'Nagada Sang Dhol'],
+    ['Arjun', '1694871420416-9feeb629dda4', 'teach', 'the 3-clap step'], ['Rohan', '1637651808680-d054b0744fe8', null, ''], ['Nikhil', '1782323709687-43675cbddd46', 'find', 'food stalls'],
+    ['Vivaan', '1625327009034-039a65fa3153', 'flag', 'Dances even to the slow songs'], ['Dev', '1503443207922-dff7d543fd0e', 'anthem', 'Dholida'], ['Ishaan', '1722667499667-723883166a5a', 'find', 'dhol'],
+    ['Karan', '1648721964576-2aea1c03d642', 'teach', 'how not to hit your partner'], ['Siddharth', '1638368349569-e49499196d9f', null, ''], ['Yash', '1583852469342-18a99d0133f9', 'flag', 'Brings spare sticks'],
+    ['Pranav', '1785338486017-354479d67699', 'anthem', 'Pankhida'], ['Varun', '1648577736141-58d4c7dcb66d', 'find', 'photo booth'], ['Manav', '1644966486873-39171635ab43', 'teach', 'Garba in 10 minutes'],
+    ['Raghav', '1667655787062-b675b26d5c4b', 'flag', 'Shows up on time']],
 };
-const ME_SAMPLE = {male: UNSPLASH('1570295999919-56ceb5ecca61'), female: UNSPLASH('1438761681033-6461ffad8d80')};
+const ME_SAMPLE = {male: UNSPLASH('1507003211169-0a1dd7228f2d'), female: UNSPLASH('1438761681033-6461ffad8d80')};
 class MockApi {
   constructor() {
     this.db = store.get('dn_mock', {users: {}});
@@ -650,6 +665,8 @@ class MockApi {
   async getLeaderboard(board, period) {
     await sleep(220);
     const g = board === 'queen' ? 'female' : 'male', key = period === 'tonight' ? 'tonight' : 'week';
+    this.ticks = (this.ticks || 0) + 1;
+    if (this.ticks > 1) for (const p of this.people) if (p.gender === g && rng(p.id + this.ticks)() < 0.25) { p.tonight += 1 + Math.floor(rng(p.id + 'x' + this.ticks)() * 3); p.week += 2; }
     const rows = this.people.filter(p => p.gender === g && p.inBoard).map(p => ({id: p.id, name: p.name, college: p.college, photo: p.photos[0], count: p[key], tie: p.id}));
     let me = null;
     if (S.user && S.profile && S.user.gender === g && S.profile.inBoard) {
@@ -947,7 +964,7 @@ SCREENS.phone = () => {
 SCREENS.code = () => {
   const L = CONFIG.OTP_LENGTH;
   obFrame(`<h1 class="title">Enter the<em>code.</em></h1>
-    <div class="otp" id="otp" style="--n:${L}">${Array.from({length: L}, (_, i) => `<input inputmode="numeric" maxlength="${i ? 1 : L}" autocomplete="${i ? 'off' : 'one-time-code'}" aria-label="Digit ${i + 1} of ${L}" ${i ? '' : 'data-autofocus'}>`).join('')}</div>
+    <div class="otp" id="otp" style="--n:${L}">${Array.from({length: L}, (_, i) => `<input inputmode="numeric" size="1" maxlength="${i ? 1 : L}" autocomplete="${i ? 'off' : 'one-time-code'}" aria-label="Digit ${i + 1} of ${L}" ${i ? '' : 'data-autofocus'}>`).join('')}</div>
     <p class="err" id="err" role="alert" style="margin-top:10px"></p>
     <p class="note" style="margin-top:4px">Sent on WhatsApp to +91 ${fmtPhone(S.phone)}. <button class="text-btn" id="chg" style="min-height:0;font-size:12px"><u>Change</u></button><br>
       <button class="text-btn" id="rs" disabled style="min-height:32px;font-size:12px">Resend in 30s</button>
@@ -1010,9 +1027,9 @@ SCREENS.birthday = () => {
   obFrame(`<h1 class="title">When’s your<em>birthday?</em></h1>
     ${linked ? `<p class="from-pp">From your Picapool account: ${esc(S.user.firstName)}${S.user.gender ? ` · ${S.user.gender === 'female' ? 'Girl' : 'Guy'}` : ''}</p>` : ''}
     <div class="dob" role="group" aria-label="Date of birth">
-      <input class="field" id="dd" inputmode="numeric" maxlength="2" placeholder="DD" aria-label="Day" autocomplete="bday-day" data-autofocus>
-      <input class="field" id="mm" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Month" autocomplete="bday-month">
-      <input class="field" id="yy" inputmode="numeric" maxlength="4" placeholder="YYYY" aria-label="Year" autocomplete="bday-year">
+      <input class="field" id="dd" inputmode="numeric" size="2" maxlength="2" placeholder="DD" aria-label="Day" autocomplete="bday-day" data-autofocus>
+      <input class="field" id="mm" inputmode="numeric" size="2" maxlength="2" placeholder="MM" aria-label="Month" autocomplete="bday-month">
+      <input class="field" id="yy" inputmode="numeric" size="4" maxlength="4" placeholder="YYYY" aria-label="Year" autocomplete="bday-year">
     </div>
     <div class="age" id="age" aria-live="polite"><small>Only to check you’re 18+. Never shown or stored.</small></div>
     <button class="btn" id="nx" disabled>I’m 18 or older, continue ${IC.arrow}</button>`);
@@ -1231,8 +1248,8 @@ async function renderFeed() {
   const noPhoto = !myPhoto();
   app.innerHTML = `${demoFlag()}<section class="screen app">
     <header class="head"><img class="mark" src="${MARK}" alt="Picapool">${tonightChip()}<button class="icon-btn" id="inv" aria-label="Invite friends">${IC.share}</button></header>
-    <h1 class="sr-only">${reviewing ? 'People you skipped' : 'People going on your nights'}</h1>
-    ${reviewing ? `<div class="seg"><button aria-pressed="true">People you skipped</button><button id="doneRev">Back to new people</button></div>`
+    <h1 class="sr-only">${reviewing ? 'Profiles you skipped' : 'People going on your nights'}</h1>
+    ${reviewing ? `<div class="seg"><button aria-pressed="true">Reviewing skipped profiles</button><button id="doneRev">Done</button></div>`
       : `<div class="seg" role="group" aria-label="Show"><button data-f="mine" aria-pressed="${!feed.allNights}">My nights</button><button data-f="all" aria-pressed="${feed.allNights}">All nights</button></div>`}
     ${noPhoto ? `<div class="nudge"><p><b>Add a photo</b> so people can see your pass. Nobody sees you until you do.</p><button class="sb pri" id="addPh">Add</button></div>` : ''}
     ${S.profile.paused ? `<div class="nudge"><p><b>Your pass is paused.</b> Nobody new can see you.</p><button class="sb" id="unpause">Resume</button></div>` : ''}
@@ -1251,7 +1268,10 @@ async function renderFeed() {
     try { const r = await api.getFeed({allNights: feed.allNights, passed: reviewing}); feed.queue = (r.profiles || []).filter(p => !S.blocked.includes(p.id)); if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday; }
     catch (e) { if ($('#deck')) { $('#deck').innerHTML = `<div class="empty"><p>${esc(e.message)}</p><button class="btn light" id="retry">Try again</button></div>`; $('#retry').onclick = renderFeed; } return; }
   }
-  if (route === 'app' && tab === 'feed') drawDeck();
+  if (route === 'app' && tab === 'feed') {
+    drawDeck();
+    if (!myPhoto() && !S.photoAsked && !$('.sheet-bg', app) && !$('.paired', app)) { S.photoAsked = true; save(); track('photo_prompt', {when: 'arrive'}); photosSheet({first: true}); }
+  }
 }
 function startReview() { feed.mode = 'passed'; feed.queue = []; track('review_passed'); renderFeed(); }
 function endReview() { feed.mode = 'new'; feed.queue = []; renderFeed(); }
@@ -1267,14 +1287,15 @@ function drawDeck() {
         : `<div class="empty"><h2>That’s everyone<em>for now.</em></h2><p>Make your pass and we’ll show you people as they join.</p><button class="btn" id="e1">Make my pass</button></div>`;
       $('#e1').onclick = () => go('phone'); return;
     }
-    if (feed.mode === 'passed') { d.innerHTML = `<div class="empty"><h2>That’s everyone<em>you skipped.</em></h2><button class="btn light" id="e2">Back to new people</button></div>`; $('#e2').onclick = endReview; return; }
-    d.innerHTML = `<div class="empty"><h2>You’ve seen everyone<em>${feed.allNights ? 'for now.' : 'on your nights.'}</em></h2><p>More people join every hour. Bring your friends along.</p>
-      <button class="btn" id="e3">${IC.share} Invite friends</button>
-      ${feed.allNights ? '' : '<button class="btn light" id="e4">Show all nights</button>'}
-      <button class="text-btn" id="e5">${IC.undo} Look at people you skipped</button></div>`;
+    if (feed.mode === 'passed') { d.innerHTML = `<div class="empty"><h2>That’s everyone<em>you skipped.</em></h2><p>Changed your mind about anyone? Pick them now; the rest stay skipped.</p><button class="btn light" id="e2">Back to new people</button></div>`; $('#e2').onclick = endReview; return; }
+    const skipped = Object.values(S.swipes || {}).some(x => x.dir === 'left');
+    d.innerHTML = `<div class="empty"><h2>You’ve seen everyone<em>${feed.allNights ? 'for now.' : 'on your nights.'}</em></h2><p>More people join every hour. ${skipped ? 'Or take another look at the people you skipped.' : 'Bring your friends along.'}</p>
+      ${skipped ? `<button class="btn" id="e5">${IC.undo} Review skipped profiles</button>` : ''}
+      <button class="btn ${skipped ? 'light' : ''}" id="e3">${IC.share} Invite friends</button>
+      ${feed.allNights ? '' : '<button class="btn light" id="e4">Show all nights</button>'}</div>`;
     $('#e3').onclick = () => openInvite();
     $('#e4') && ($('#e4').onclick = () => { feed.allNights = true; feed.queue = []; renderFeed(); });
-    $('#e5').onclick = startReview;
+    $('#e5') && ($('#e5').onclick = startReview);
     return;
   }
   if (acts) acts.style.visibility = '';
@@ -1328,12 +1349,13 @@ async function fly(el, p, dir) {
   } catch (e) { toast(esc(e.message || "Couldn't save that. Check your internet.")); }
   if (!matched) afterSwipePrompts();
 }
-/* after the first swipe, once: ask for the photo (v2: the photo comes after the first swipe). After 5 swipes, once: invite them to add a line. */
+/* Photos: asked on the first arrival in Discover; if skipped, asked once more after the first swipe (the "Add a photo" bar stays until there is one).
+   After 5 swipes, once: invite them to add a line to their pass. */
 function afterSwipePrompts() {
   setTimeout(() => {
     if (route !== 'app' || tab !== 'feed' || $('.sheet-bg', app) || $('.paired', app)) return;
-    if (!myPhoto() && !S.photoAsked) { S.photoAsked = true; save(); track('photo_prompt'); return photosSheet({first: true}); }
-    if (!S.lineAsked && myPhoto() && !S.profile.prompt && (S.feedSwipes || 0) >= 5) { S.lineAsked = true; save(); track('line_prompt'); lineSheet(true); }
+    if (!myPhoto() && !S.photoAsked2) { S.photoAsked = S.photoAsked2 = true; save(); track('photo_prompt', {when: 'first_swipe'}); return photosSheet({first: true}); }
+    if (!S.lineAsked && !S.profile.prompt && (S.feedSwipes || 0) >= 5) { S.lineAsked = true; save(); track('line_prompt'); lineSheet(true); }
   }, 420);
 }
 function limitSheet() {
@@ -1585,7 +1607,7 @@ async function loadSent() {
 }
 
 /* ---------- board: Garba Queen / Garba King, tonight and all of Navratri. No public counts. ---------- */
-let lb = {board: null, period: 'tonight'};
+let lb = {board: null, period: 'tonight', prev: {}, timer: null};
 async function renderBoard() {
   lb.board ??= myBoardKey();
   app.innerHTML = `${demoFlag()}<section class="screen app">
@@ -1599,18 +1621,29 @@ async function renderBoard() {
   bindTabs();
   $$('[data-b]').forEach(b => b.onclick = () => { lb.board = b.dataset.b; renderBoard(); });
   $$('[data-p]').forEach(b => b.onclick = () => { lb.period = b.dataset.p; renderBoard(); });
+  await loadBoard(false);
+  /* live: while the board is open and visible, it refreshes every 15 seconds and shows who moved */
+  clearInterval(lb.timer);
+  lb.timer = setInterval(() => { if (route !== 'app' || tab !== 'board') return clearInterval(lb.timer); if (!document.hidden && !$('.sheet-bg', app)) loadBoard(true); }, 15000);
+}
+async function loadBoard(silent) {
   const want = lb.board + lb.period;
-  let r; try { r = await api.getLeaderboard(lb.board, lb.period); } catch (e) { if ($('#lbBody')) $('#lbBody').innerHTML = `<p class="nothing">${esc(e.message)}</p>`; return; }
+  let r; try { r = await api.getLeaderboard(lb.board, lb.period); } catch (e) { if (!silent && $('#lbBody')) $('#lbBody').innerHTML = `<p class="nothing">${esc(e.message)}</p>`; return; }
   if (!$('#lbBody') || want !== lb.board + lb.period) return;
+  const prev = lb.prev[want] || {}, ranks = {};
+  (r.top || []).forEach((p, i) => ranks[p.id] = i + 1);
+  const moved = id => { const was = prev[id], now = ranks[id]; if (!silent || !now) return ''; if (!was) return '<span class="mv up" aria-label="New on the board">new</span>';
+    return was > now ? `<span class="mv up" aria-label="Up ${was - now}">▲${was - now}</span>` : was < now ? `<span class="mv down" aria-label="Down ${now - was}">▼${now - was}</span>` : ''; };
+  lb.prev[want] = ranks;
   if (lb.period === 'tonight' && lb.board === myBoardKey() && S.profile.inBoard) setCrown(r.me && r.me.rank ? {rank: r.me.rank, day: todayISO()} : null);
   const top = r.top || [];
-  const pod = (p, rk) => p ? `<div class="pod p${rk}"><span class="cr">${rk === 1 ? IC.crown : ''}</span><div class="av"><img src="${esc(p.photo)}" alt=""></div><b>${esc(p.name)}</b><small>${esc(shortCollege(p.college))}</small><div class="base">${rk}</div></div>` : '<div></div>';
+  const pod = (p, rk) => p ? `<div class="pod p${rk}"><span class="cr">${rk === 1 ? IC.crown : ''}</span><div class="av"><img src="${esc(p.photo)}" alt=""></div><b>${esc(p.name)} ${moved(p.id)}</b><small>${esc(shortCollege(p.college))}</small><div class="base">${rk}</div></div>` : '<div></div>';
   const mine = (S.user.gender === 'female') === (lb.board === 'queen');
   $('#lbBody').innerHTML = (top.length ? `<div class="podium">${pod(top[1], 2)}${pod(top[0], 1)}${pod(top[2], 3)}</div>
-      ${top.slice(3).map((p, i) => `<div class="rk"><span class="n">${i + 4}</span><img src="${esc(p.photo)}" alt=""><span style="min-width:0"><b>${esc(p.name)}</b><small>${esc(p.college)}</small></span>${p.isMe ? '<span class="you">YOU</span>' : ''}</div>`).join('')}`
+      ${top.slice(3).map((p, i) => `<div class="rk"><span class="n">${i + 4}</span><img src="${esc(p.photo)}" alt=""><span style="min-width:0"><b>${esc(p.name)} ${moved(p.id)}</b><small>${esc(p.college)}</small></span>${p.isMe ? '<span class="you">YOU</span>' : ''}</div>`).join('')}`
     : '<p class="nothing">No crowns yet tonight. The first picks decide it.</p>')
     + (mine ? myBoardCard(r.me) : '')
-    + '<p class="note">Updates every minute. Counts are never shown publicly.</p>';
+    + `<p class="note"><span class="livedot" aria-hidden="true"></span>Live · updated ${new Date().toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}. Counts are never shown publicly.</p>`;
   $('#joinLb') && ($('#joinLb').onclick = () => setBoard(true));
   $('#shareRank') && ($('#shareRank').onclick = () => openShare('rank', r.me.rank, lb.period));
 }
@@ -1661,7 +1694,7 @@ function renderMe() {
     </div>
     ${tabsHtml()}</section>`;
   bindTabs();
-  $('#sh').onclick = $('#sh2').onclick = () => openInvite();
+  $('#sh').onclick = $('#sh2').onclick = () => storySheet('partner');
   $('#flaunt') && ($('#flaunt').onclick = () => openShare('rank', S.crown.rank, 'tonight'));
   $('#addPh2') && ($('#addPh2').onclick = () => photosSheet());
   $('#ep').onclick = () => photosSheet();
@@ -1679,7 +1712,7 @@ function renderMe() {
 }
 
 /* ---------- photos: up to 5, several at once, the first is the main photo ---------- */
-function photosSheet({first = false} = {}) {
+function photosSheet({first = false, then = null} = {}) {
   let photos = [...(S.profile.photos || [])];
   const paint = s => {
     const n = photos.length;
@@ -1687,6 +1720,8 @@ function photosSheet({first = false} = {}) {
       ? `<div class="slot filled${i ? '' : ' main'}" role="group" aria-label="Photo ${i + 1}${i ? '' : ', main photo'}" style="background-image:url('${esc(photos[i])}')"><button class="x" data-rm="${i}" aria-label="Remove photo ${i + 1}">×</button>${i ? `<button class="tag2" data-main="${i}" aria-label="Make photo ${i + 1} the main photo">Make main</button>` : '<span class="tag2">Main</span>'}</div>`
       : `<label class="slot${i ? '' : ' main'}" for="pf" aria-label="Add photos">${IC.plus}</label>`).join('');
     $('#psave', s).disabled = !n;
+    $('#pcount', s).textContent = n >= CONFIG.MAX_PHOTOS ? `${n} of ${CONFIG.MAX_PHOTOS} photos. That’s the most you can add.` : `${n} of ${CONFIG.MAX_PHOTOS} photos${n ? '. Tap “Make main” to change the first one.' : ''}`;
+    $('#pf', s).disabled = n >= CONFIG.MAX_PHOTOS;
     $$('[data-rm]', s).forEach(b => b.onclick = e => { e.preventDefault(); photos.splice(+b.dataset.rm, 1); paint(s); });
     $$('[data-main]', s).forEach(b => b.onclick = () => { photos.unshift(...photos.splice(+b.dataset.main, 1)); paint(s); });
   };
@@ -1694,9 +1729,10 @@ function photosSheet({first = false} = {}) {
     <p class="p">${first ? 'Nobody can see your pass until you add one. One clear photo of your face is all it takes.' : `Up to ${CONFIG.MAX_PHOTOS}. The main photo is the one people see first.`}</p>
     <div class="photos" id="slots"></div>
     <input type="file" id="pf" class="file-input" accept="image/*" multiple aria-label="Add photos">
+    <p class="note" id="pcount" style="margin:0 0 6px"></p>
     <p class="err" id="perr" role="alert"></p>
     <button class="btn" id="psave" disabled>${first ? 'Done' : 'Save photos'}</button>
-    ${isDemo() ? '<button class="text-btn" id="psam">Use a sample photo (demo)</button>' : `<button class="text-btn" id="pno">${first ? 'Later' : 'Cancel'}</button>`}`, s => {
+    ${isDemo() ? '<button class="text-btn" id="psam">Use a sample photo (demo)</button>' : ''}<button class="text-btn" id="pno">${first ? 'Later' : 'Cancel'}</button>`, s => {
     paint(s);
     $('#pf', s).onchange = async e => {
       const files = [...(e.target.files || [])]; e.target.value = ''; if (!files.length) return;
@@ -1705,16 +1741,16 @@ function photosSheet({first = false} = {}) {
       err.style.color = 'var(--muted)'; err.textContent = files.length > 1 ? 'Adding photos…' : 'Adding photo…';
       let failed = 0;
       for (const f of files.slice(0, room)) { try { photos.push(await cropImage(f, 720, 900)); } catch (x) { failed++; } }
-      err.style.color = ''; err.textContent = [failed ? `${failed} photo${failed > 1 ? 's' : ''} couldn’t be read. Try JPG or PNG.` : '', files.length > room ? `Only ${CONFIG.MAX_PHOTOS} photos fit.` : ''].filter(Boolean).join(' ');
+      err.style.color = ''; err.textContent = [failed ? `${failed} photo${failed > 1 ? 's' : ''} couldn’t be read. Try JPG or PNG.` : '', files.length > room ? `Only ${CONFIG.MAX_PHOTOS} photos fit, so we added the first ${room}.` : ''].filter(Boolean).join(' ');
       paint(s);
     };
-    $('#psam', s) && ($('#psam', s).onclick = () => { photos.push(ME_SAMPLE[S.user.gender] || ME_SAMPLE.male); paint(s); });
+    $('#psam', s) && ($('#psam', s).onclick = () => { if (photos.length < CONFIG.MAX_PHOTOS) photos.push(ME_SAMPLE[S.user.gender] || ME_SAMPLE.male); paint(s); });
     $('#pno', s) && ($('#pno', s).onclick = () => closeSheet());
     $('#psave', s).onclick = async () => {
       const b = $('#psave', s); b.disabled = true; b.textContent = 'Saving…';
       const had = !!myPhoto();
       try { const r = await api.saveProfile({...profilePayload(), photos}); S.profile = r.profile; save(); track('photos_done', {count: photos.length, first: !had}); closeSheet();
-        toast(had ? 'Saved' : `${IC.check} Your pass is live. People can see you now.`); if (route === 'app') go('app'); }
+        toast(had ? 'Saved' : `${IC.check} Your pass is live. People can see you now.`); if (route === 'app') go('app'); if (then) then(); }
       catch (e) { b.disabled = false; b.textContent = first ? 'Done' : 'Save photos'; $('#perr', s).textContent = e.message; }
     };
   });
@@ -1823,35 +1859,49 @@ function copyLink(link, where, onDone) {
   if (!canClipboard()) return fallback();
   try { navigator.clipboard.writeText(link).then(onDone, fallback); } catch (e) { fallback(); }
 }
-async function posterInto(s, kind, rank, period, text, cls) {
+/* The story sheet: a 1080×1920 image made on the phone, shared straight to an Instagram story or WhatsApp status through the phone's share sheet.
+   Where a browser can't share files (most in-app browsers, laptops): Save image, then post it from the gallery. The invite link is copied too,
+   so it can go on the Instagram Link sticker. */
+async function storySheet(kind, rank, period) {
+  period = period || 'tonight';
+  const crown = kind === 'rank';
+  track('share_open', {kind, story: true});
+  if (!myPhoto()) return sheet(`<h2>Add a photo<em>for your story.</em></h2><p class="p">Your story image uses your main photo.</p>
+    <button class="btn" id="sp1">Add a photo</button><button class="text-btn" id="sp2">Not now</button>`, s => {
+    $('#sp1', s).onclick = () => photosSheet({then: () => storySheet(kind, rank, period)}); $('#sp2', s).onclick = () => closeSheet(); });
+  const text = shareText(kind, rank, period), link = shareLink();
+  const s = sheet(`<h2>${crown ? 'Flaunt<em>your crown.</em>' : 'Post your pass<em>to your story.</em>'}</h2>
+    <div class="story" id="stWrap"><div class="spinner"></div></div>
+    <div id="stBtns"></div><p class="note" id="stHint" style="margin:6px 0 0"></p>
+    <div class="divider">Or send the link</div>
+    <a class="btn wa" id="shWa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">${IC.wa} Send on WhatsApp</a>
+    <div id="lkSel" style="margin-top:8px"></div><button class="btn light" id="shLink" style="margin-top:8px">Copy link</button>`);
+  $('#shWa', s).onclick = () => track('share', {kind, via: 'wa_text'});
+  $('#shLink', s).onclick = () => copyLink(link, $('#lkSel', s), () => { toast('Link copied'); track('share', {kind, via: 'copy_link'}); });
   try {
-    if (!myPhoto()) throw new Error('no photo');
     const c = await makeShareCard(kind, rank, period);
     const blob = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/png'));
     if (!document.body.contains(s)) return;
-    const file = new File([blob], kind === 'rank' ? 'picapool-crown.png' : 'picapool-dandiya.png', {type: 'image/png'});
+    const file = new File([blob], crown ? 'dandiya-nights-crown.png' : 'dandiya-nights-pass.png', {type: 'image/png'});
     const url = URL.createObjectURL(blob);
     const canFile = !!(navigator.canShare && (() => { try { return navigator.canShare({files: [file]}); } catch (e) { return false; } })());
-    $('#shWrap', s).innerHTML = `<img class="poster" src="${url}" alt="${kind === 'rank' ? 'Your crown poster' : 'Your Dandiya pass poster'}">`;
-    $('#shMain', s).innerHTML = canFile ? `<button class="${cls}" id="shStory">Post to story</button>`
-      : TOP ? `<a class="${cls}" href="${url}" download="${file.name}" id="shSave">Save image</a>`
-      : '<p class="note" style="margin:0 0 12px">Long-press the image to save it.</p>';
-    $('#shStory', s) && ($('#shStory', s).onclick = async () => { try { await navigator.share({files: [file], text: kind === 'rank' ? '' : text}); track('share', {kind, via: 'story'}); } catch (e) {} });
-    $('#shSave', s) && ($('#shSave', s).onclick = () => track('share', {kind, via: 'save'}));
-  } catch (e) { if (document.body.contains(s)) $('#shWrap', s).innerHTML = `<p class="note" style="margin:0 0 8px">${myPhoto() ? 'Couldn’t make the image here. Share the link instead.' : 'Add a photo to make a story poster.'}</p>`; }
+    $('#stWrap', s).innerHTML = `<img src="${url}" alt="${crown ? 'Your crown story' : 'Your Dandiya pass story'}">`;
+    const go2 = async via => {
+      if (canClipboard()) { try { await navigator.clipboard.writeText(link); } catch (e) {} }
+      try { await navigator.share({files: [file]}); track('share', {kind, via}); } catch (e) {}
+    };
+    if (canFile) {
+      $('#stBtns', s).innerHTML = `<button class="btn ig" id="stIg">Share to Instagram story</button><button class="btn wa" id="stWa" style="margin-top:8px">${IC.wa} Share to WhatsApp status</button>`;
+      $('#stHint', s).textContent = 'In the share menu, pick Instagram → Your story, or WhatsApp → My status. Your link is copied for the Instagram Link sticker.';
+      $('#stIg', s).onclick = () => go2('instagram_story'); $('#stWa', s).onclick = () => go2('whatsapp_status');
+    } else if (TOP) {
+      $('#stBtns', s).innerHTML = `<a class="btn ig" href="${url}" download="${file.name}" id="stSave">${IC.download} Save image</a>`;
+      $('#stHint', s).textContent = 'Then open Instagram or WhatsApp and add it to your story or status from your gallery.';
+      $('#stSave', s).onclick = () => track('share', {kind, via: 'save'});
+    } else $('#stHint', s).textContent = 'Long-press the image to save it, then add it to your Instagram story or WhatsApp status.';
+  } catch (e) { if (document.body.contains(s)) $('#stWrap', s).innerHTML = '<p class="note">Couldn’t make the image here. Send the link instead.</p>'; }
 }
-async function openShare(kind, rank, period) {
-  if (kind !== 'rank') return openInvite();
-  period = period || 'tonight'; track('share_open', {kind});
-  const text = shareText(kind, rank, period);
-  const s = sheet(`<h2>Flaunt<em>your crown.</em></h2>
-    <div id="shWrap"><div class="spinner"></div></div><div id="shMain"></div>
-    <a class="btn wa" id="shWa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">${IC.wa} Send on WhatsApp</a>
-    <div id="lkSel"></div><button class="btn light" id="shLink">Copy link</button>`);
-  $('#shWa', s).onclick = () => track('share', {kind, via: 'wa_text'});
-  $('#shLink', s).onclick = () => copyLink(shareLink(), $('#lkSel', s), () => { toast('Link copied. On Instagram, add it with the Link sticker.'); track('share', {kind, via: 'copy_link'}); });
-  posterInto(s, 'rank', rank, period, text, 'btn gold');
-}
+async function openShare(kind, rank, period) { return storySheet(kind, rank, period); }
 async function openInvite() {
   track('share_open', {kind: 'partner'});
   const link = shareLink(), text = shareText('partner');
@@ -1861,11 +1911,11 @@ async function openInvite() {
     ${canShareLink() ? `<button class="btn" id="shInvite">${IC.share} Share invite link</button><button class="btn light" id="shLink">Copy invite link</button>` : `<button class="btn" id="shLink">Copy invite link</button>`}
     <a class="btn wa" id="shWa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener" style="margin-top:8px">${IC.wa} Send on WhatsApp</a>
     <div class="divider">Or post a story</div>
-    <div id="shWrap"><div class="spinner"></div></div><div id="shMain"></div>`);
+    <button class="btn ig" id="shStory2">Post my pass to my story</button>`);
   $('#shInvite', s) && ($('#shInvite', s).onclick = async () => { try { await navigator.share({title: CONFIG.PRODUCT, text: text.replace(link, '').trim(), url: link}); track('share', {kind: 'partner', via: 'invite_link'}); } catch (e) {} });
   $('#shLink', s).onclick = () => copyLink(link, $('#lkSel', s), () => { toast('Invite link copied'); track('share', {kind: 'partner', via: 'copy_link'}); });
   $('#shWa', s).onclick = () => track('share', {kind: 'partner', via: 'wa_text'});
-  posterInto(s, 'partner', null, null, text, 'btn light');
+  $('#shStory2', s).onclick = () => storySheet('partner');
 }
 const loadImg = src => new Promise((res, rej) => { const i = new Image(); if (/^https?:/.test(src)) i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = rej; i.src = src; });
 function cover(ctx, img, x, y, w, h) { const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, ir = iw / ih, r = w / h; let sw = iw, sh = ih, sx = 0, sy = 0;
