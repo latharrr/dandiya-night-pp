@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Stick Together Admin</title>
+<style>
+:root{--ink:#1B1410;--muted:#6B5D54;--cream:#FFF6EC;--orange:#FF6B22;--soft:#FFE4D1;--red:#D92D39}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
+main{max-width:900px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:22px;margin:0}
+h2{font-size:15px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+section{background:#fff;border:2px solid var(--ink);border-radius:14px;padding:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi b{display:block;font-size:26px;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:12.5px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--soft)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select,button{font:inherit;padding:8px 12px;border:2px solid var(--ink);border-radius:10px;background:#fff}
+button{background:var(--orange);color:#fff;font-weight:700;cursor:pointer}
+button.ghost{background:#fff;color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.person{border:2px solid var(--ink);border-radius:12px;overflow:hidden;background:#fff}
+.person img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:var(--soft)}
+.person div{padding:6px 8px}
+.person .hide{width:100%;border-radius:0;border-width:2px 0 0;background:var(--red)}
+.muted{color:var(--muted)}
+.err{color:var(--red);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <div class="row"><h1>Stick Together · Admin</h1></div>
+  <section class="row"><label for="key">Admin key</label><input id="key" type="password" autocomplete="off"><button id="load">Load</button><span class="err" id="err"></span></section>
+  <section><h2>Numbers</h2><div class="kpis" id="kpis"><span class="muted">Enter the key and press Load.</span></div></section>
+  <section><h2>Top 20 check (before posting the nightly board)</h2>
+    <div class="row" style="margin-bottom:10px"><select id="board"><option value="queen">Garba Queen</option><option value="king">Garba King</option></select>
+    <select id="period"><option value="tonight">Tonight</option><option value="week">All Navratri</option></select><button class="ghost" id="loadTop">Show</button></div>
+    <div class="grid" id="top"></div></section>
+  <section><h2>Reported profiles</h2><div class="grid" id="reports"><span class="muted">None loaded.</span></div></section>
+  <section><h2>Name or gender differs from Picapool</h2><p class="muted" style="margin:0 0 8px">Their card keeps working with the Stick Together gender. Check with the person, then fix it in the Picapool app (the next sync clears this) or hide the card.</p><table id="conflicts"></table></section>
+  <section><h2>Signups by link (ref)</h2><table id="refs"></table></section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let KEY = '';
+try { KEY = sessionStorage.getItem('st_admin') || ''; $('#key').value = KEY; } catch (e) {}
+async function api(path, opts = {}) {
+  const r = await fetch('/api/admin' + path, {...opts, headers: {'Content-Type': 'application/json', 'X-Admin-Key': KEY, ...(opts.headers || {})}});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.message || 'Request failed');
+  return j;
+}
+const person = (p, extra = '') => `<div class="person"><img src="${esc(p.photo)}" alt=""><div><b>${esc(p.name)}</b><br><span class="muted">${esc(p.college)}</span>${extra}</div>
+  <button class="hide" data-id="${esc(p.id || p.userId)}" data-h="${p.hidden ? 0 : 1}">${p.hidden ? 'Unhide' : 'Hide'}</button></div>`;
+async function load() {
+  KEY = $('#key').value.trim(); try { sessionStorage.setItem('st_admin', KEY); } catch (e) {}
+  $('#err').textContent = '';
+  try {
+    const s = await api('/summary');
+    const k = (n, l) => `<div class="kpi"><b>${n}</b><span>${l}</span></div>`;
+    const g = Object.fromEntries(s.profiles.byGender.map(r => [r.gender, r.n]));
+    $('#kpis').innerHTML = k(s.accounts.completed, 'accounts created') + k(s.accounts.perDay[0]?.day === s.today ? s.accounts.perDay[0].n : 0, 'accounts today')
+      + k(s.profiles.total, 'Dandiya cards') + k(`${g.female || 0} / ${g.male || 0}`, 'girls / guys') + k(s.swipes.right, 'right swipes')
+      + k(s.matches.total, 'matches') + k(s.matches.chats, 'chats opened') + k(s.matches.numbersShared, 'numbers shared')
+      + k(s.reportsPending, 'reported profiles') + k(s.ageBlocks, 'under-18 blocked')
+      + k(s.messageRequestsWaiting, 'message requests waiting') + k(s.identityConflicts, 'Picapool clashes');
+    const cf = await api('/conflicts');
+    $('#conflicts').innerHTML = cf.rows.length ? '<tr><th>Name</th><th>Phone</th><th>Card gender</th><th>Clash</th></tr>' + cf.rows.map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.phone)}</td><td>${esc(r.gender)}</td><td>${esc(r.conflict)}</td></tr>`).join('') : '<tr><td class="muted">None.</td></tr>';
+    $('#refs').innerHTML = '<tr><th>Ref</th><th>Accounts</th></tr>' + s.topRefs.map(r => `<tr><td>${esc(r.ref)}</td><td>${r.n}</td></tr>`).join('');
+    const rp = await api('/reports');
+    $('#reports').innerHTML = rp.rows.length ? rp.rows.map(r => person(r, `<br><span class="muted">${r.reports} report(s): ${esc(r.reasons)}</span>`)).join('') : '<span class="muted">No open reports.</span>';
+    await loadTop();
+  } catch (e) { $('#err').textContent = e.message; }
+}
+async function loadTop() {
+  try { const t = await api(`/top?board=${$('#board').value}&period=${$('#period').value}`);
+    $('#top').innerHTML = t.rows.length ? t.rows.map((p, i) => person(p, `<br><span class="muted">#${i + 1} · ${p.count} right swipes</span>`)).join('') : '<span class="muted">Nobody yet.</span>';
+  } catch (e) { $('#err').textContent = e.message; }
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('.hide'); if (!b) return;
+  b.disabled = true;
+  try { await api('/hide', {method: 'POST', body: JSON.stringify({userId: b.dataset.id, hidden: b.dataset.h === '1'})}); await load(); } catch (err) { $('#err').textContent = err.message; b.disabled = false; }
+});
+$('#load').onclick = load; $('#loadTop').onclick = loadTop;
+if (KEY) load();
+</script>
+</body>
+</html>

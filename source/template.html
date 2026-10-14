@@ -1,0 +1,1974 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#161214">
+<meta name="description" content="Find your Dandiya partner in North Campus. Swipe on people going the same night, match and plan it on Picapool.">
+<meta property="og:title" content="Stick Together · Find your Dandiya partner">
+<meta property="og:description" content="For North Campus students. Find a Dandiya partner going the same night.">
+<title>Stick Together</title>
+<link rel="icon" href="__MARK__">
+<style>
+/* Fonts embedded (Poppins: Picapool brand · Yatra One: festive display). Both SIL Open Font License. No font server needed. */
+@font-face{font-family:Poppins;font-weight:400;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,__FONT_P400__) format("woff2")}
+@font-face{font-family:Poppins;font-weight:500;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,__FONT_P500__) format("woff2")}
+@font-face{font-family:Poppins;font-weight:600;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,__FONT_P600__) format("woff2")}
+@font-face{font-family:Poppins;font-weight:700;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,__FONT_P700__) format("woff2")}
+@font-face{font-family:Poppins;font-weight:800;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,__FONT_P800__) format("woff2")}
+@font-face{font-family:"Yatra One";font-weight:400;font-style:normal;font-display:swap;src:url(data:font/woff2;base64,__FONT_YATRA__) format("woff2")}
+/* Stick Together · build h
+   Layout: full-screen app shell, content column ≤520px centred.
+   Colour roles: ink night (or warm cream by day) = ground · Picapool orange = brand and actions · gold = crowns only · Navratri night colours = small accents (night chips, beads).
+   Type: Yatra One (festive display) for big moments only; Poppins (Picapool brand) for everything else.
+   Flat surfaces, one radius scale (12 / 16 / 20), shadows only where something floats (sheets, toasts). */
+:root{
+  color-scheme:dark;
+  --night:#161214; --surface:#211B1E; --surface-2:#2C2529; --ground:#2C2529;
+  --line:rgba(255,244,232,.10); --line-2:rgba(255,244,232,.20);
+  --text:#FFF4E8; --muted:#BDB0A8; --faint:rgba(255,244,232,.42); --placeholder:rgba(255,244,232,.6);
+  --orange:#FF6B22; --orange-ink:#1C0C04; --accent-text:#FF8A4C; --orange-soft:rgba(255,107,34,.16);
+  --gold:#F4C24D; --gold-2:#FFE08A; --gold-ink:#2A1A00; --gold-text:#F4C24D;
+  --red:#FF6B74; --wa:#25D366; --focus:#F4C24D;
+  --nav-bg:rgba(22,18,20,.97); --scrim:rgba(8,6,7,.62);
+  --sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23FFF4E8' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  --tonight:#E0343F;
+  --r:16px; --col:520px;
+  --gutter:max(20px, calc((100% - var(--col)) / 2));
+  --sans:Poppins, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display:"Yatra One", Poppins, Georgia, serif;
+}
+:root[data-theme=day]{
+  color-scheme:light;
+  --night:#FFF8F0; --surface:#FFFFFF; --surface-2:#F6EBDF; --ground:#F1E1D0;
+  --line:rgba(30,22,18,.10); --line-2:rgba(30,22,18,.18);
+  --text:#1E1714; --muted:#66584F; --faint:rgba(30,22,18,.42); --placeholder:rgba(30,22,18,.62);
+  --accent-text:#B34700; --orange-soft:rgba(255,107,34,.14);
+  --gold-text:#8A5A00; --red:#C42B36; --focus:#B34700;
+  --nav-bg:rgba(255,248,240,.97); --scrim:rgba(30,22,18,.42);
+  --sel-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231E1714' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--night);color:var(--text);font-family:var(--sans);overscroll-behavior:none;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button,a,label,summary{touch-action:manipulation}
+button,summary{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none;background:var(--night)}
+#app input,#app textarea,.sharetext{user-select:text;-webkit-user-select:text}
+
+/* ---------- shell ---------- */
+.demo-flag{flex:none;background:var(--surface-2);color:var(--muted);font-size:11.5px;font-weight:600;text-align:center;padding:calc(env(safe-area-inset-top, 0px) + 5px) 12px 5px}
+.top{flex:none;display:flex;align-items:center;justify-content:center;position:relative;min-height:54px;padding:calc(env(safe-area-inset-top, 0px) + 8px) var(--gutter) 6px}
+.demo-flag + .top{padding-top:8px}
+.top .lockup{height:22px;display:block}
+.top .back{position:absolute;left:calc(var(--gutter) - 12px);bottom:5px;width:44px;height:44px;border:0;background:none;color:var(--text);display:grid;place-items:center;border-radius:12px}
+.top .right{position:absolute;right:calc(var(--gutter) - 10px);bottom:5px;display:flex;align-items:center}
+.theme-btn{width:44px;height:44px;border:0;background:none;color:var(--text);display:grid;place-items:center;border-radius:12px}
+.theme-btn svg{width:22px;height:22px}
+.body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:8px var(--gutter) 16px;-webkit-overflow-scrolling:touch}
+.actions{flex:none;padding:10px var(--gutter) calc(env(safe-area-inset-bottom, 0px) + 14px)}
+
+/* ---------- type ---------- */
+h1{font-size:clamp(25px,7vw,30px);line-height:1.15;font-weight:700;margin:8px 0 8px;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:19px;font-weight:700;margin:4px 0 8px;text-wrap:balance}
+.display{font-family:var(--display);font-weight:400;letter-spacing:0}
+h1.display{font-size:clamp(36px,10.5vw,48px);line-height:1.02;margin:6px 0 10px}
+h2.display{font-size:30px;line-height:1.05;color:var(--gold-text)}
+.sub{color:var(--muted);font-size:15px;line-height:1.5;margin:0 0 12px}
+.small{font-size:12.5px;color:var(--muted);line-height:1.45}
+.center{text-align:center}
+.err{color:var(--red);font-size:13px;font-weight:600;min-height:18px;margin-top:6px}
+.hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+.kicker{display:inline-flex;align-items:center;gap:6px;color:var(--accent-text);font-size:13.5px;font-weight:600}
+
+/* ---------- buttons ---------- */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:54px;border:0;border-radius:var(--r);background:var(--orange);color:var(--orange-ink);font-weight:700;font-size:16.5px;transition:transform .1s,background .2s,color .2s;text-decoration:none;padding:0 18px;text-align:center}
+.btn:active{transform:scale(.98)}
+.btn[disabled]{background:var(--surface-2);color:var(--faint);pointer-events:none}
+.btn.ghost{background:var(--surface-2);color:var(--text)}
+.btn.gold{background:var(--gold);color:var(--gold-ink)}
+.btn.wa{background:var(--wa);color:#062B14}
+.btn.danger{background:var(--red);color:#2A0508}
+.btn + .btn{margin-top:10px}
+.link{background:none;border:0;color:var(--muted);font-size:14px;font-weight:600;text-decoration:underline;text-underline-offset:3px;padding:10px 8px;display:block;margin:2px auto 0;min-height:44px}
+
+/* ---------- fields ---------- */
+.field{margin:16px 0}
+.field > label,.lbl{display:block;font-weight:600;font-size:13.5px;margin-bottom:7px;color:var(--text)}
+.input{width:100%;height:52px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--text);padding:0 14px;font-size:16.5px;outline:none;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s}
+.input::placeholder{color:var(--placeholder)}
+.input:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-soft)}
+select.input{padding-right:34px;background:var(--surface) var(--sel-arrow) no-repeat right 12px center}
+select.input option{background:var(--surface);color:var(--text)}
+.phone-wrap{display:flex;align-items:center;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);height:58px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.phone-wrap:focus-within{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-soft)}
+.phone-wrap span{padding:0 12px 0 14px;font-weight:700;color:var(--muted);border-right:1px solid var(--line);height:100%;display:flex;align-items:center}
+.phone-wrap input{flex:1;border:0;outline:none;height:100%;padding:0 12px;font-size:20px;letter-spacing:.06em;background:none;min-width:0;color:var(--text)}
+.phone-wrap input::placeholder{color:var(--placeholder)}
+.otp{letter-spacing:.5em;text-align:center;font-size:26px;font-weight:700;height:62px;padding-left:.5em}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--muted);margin:12px 0 0;padding:4px 0;min-height:44px;cursor:pointer}
+.check input{width:22px;height:22px;accent-color:var(--orange);flex:none;margin:0}
+textarea.input{height:auto;min-height:80px;padding:12px 14px;resize:none;line-height:1.45}
+.count{font-size:12px;color:var(--muted);text-align:right;margin-top:4px;font-variant-numeric:tabular-nums}
+
+/* ---------- chips: one size, one radius, flat ---------- */
+.q{margin:18px 0 9px;font-weight:600;font-size:14.5px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid transparent;background:var(--surface-2);color:var(--text);border-radius:99px;padding:8px 16px;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:8px;min-height:44px;transition:background .15s,border-color .15s,color .15s}
+.chip[aria-pressed=true]{background:var(--orange-soft);border-color:var(--orange);font-weight:600}
+.chip .dot{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.chip.night[aria-pressed=true]{background:var(--cb,var(--c));border-color:var(--cb,var(--c));color:var(--on)}
+.chip.night[aria-pressed=true] .dot{background:var(--on);opacity:.8}
+.pills{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pill{border:1px solid transparent;background:var(--surface-2);color:var(--text);border-radius:12px;min-height:52px;font-weight:600;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px}
+.pill[aria-pressed=true]{background:var(--orange);color:var(--orange-ink);font-weight:700}
+
+/* ---------- photos ---------- */
+.photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.slot{position:relative;aspect-ratio:4/5;max-width:100%;border:1px dashed var(--line-2);border-radius:12px;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:30px;font-weight:300;overflow:hidden;cursor:pointer}
+.slot.add-first{border-color:var(--orange);color:var(--accent-text)}
+.slot.filled{border:0;background-size:cover;background-position:center 30%;cursor:default}
+.slot .x{position:absolute;top:2px;right:2px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(12,9,10,.72);color:#fff;font-size:18px;line-height:1;display:grid;place-items:center}
+.slot .main{position:absolute;left:0;right:0;bottom:0;background:var(--orange);color:var(--orange-ink);font-size:12px;font-weight:700;text-align:center;padding:5px 4px;letter-spacing:.01em}
+.slot .mk{position:absolute;left:0;right:0;bottom:0;min-height:44px;border:0;background:rgba(12,9,10,.72);color:#fff;font-size:12px;font-weight:600}
+.slot .mk:hover{background:rgba(12,9,10,.85)}
+.file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.photo-note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+
+/* ---------- landing ---------- */
+.landing{display:flex;flex-direction:column;justify-content:center;text-align:center}
+.landing h1.display{margin:14px 0 6px}
+.tagline{color:var(--muted);font-size:14px;margin:0;font-weight:500}
+.garba-art{display:block;width:100%;max-width:380px;height:auto;margin:0 auto;overflow:visible}
+.garba-art .dancer{transform-box:fill-box;transform-origin:50% 100%;animation:sway 2s ease-in-out 2 both;animation-delay:var(--d,0s)}
+@keyframes sway{0%,100%{transform:rotate(0) translateY(0)}25%{transform:rotate(-5deg) translateY(-3px)}75%{transform:rotate(5deg) translateY(-3px)}}
+.garba-art .flame{transform-box:fill-box;transform-origin:50% 90%;animation:flick 1.6s ease-in-out 3}
+@keyframes flick{0%,100%{transform:scale(1,1)}30%{transform:scale(.9,1.08)}60%{transform:scale(1.05,.95)}}
+.garba-art.sm{max-width:240px}
+
+/* ---------- app nav ---------- */
+.nav{flex:none;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:var(--nav-bg);padding:0 var(--gutter) env(safe-area-inset-bottom, 0px)}
+.nav button{border:0;background:none;padding:8px 0 7px;font-size:11.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);position:relative;min-height:58px}
+.nav button svg{width:24px;height:24px}
+.nav button[aria-current=page]{color:var(--accent-text);font-weight:600}
+.nav .badge{position:absolute;top:4px;left:calc(50% + 6px);background:var(--orange);color:var(--orange-ink);font-size:10px;font-weight:700;border-radius:99px;min-width:17px;height:17px;display:grid;place-items:center;padding:0 4px}
+.nav .cdot{position:absolute;top:7px;left:calc(50% + 9px);width:9px;height:9px;border-radius:50%;background:var(--gold)}
+.ic{width:1em;height:1em;display:inline-block;vertical-align:-.12em}
+
+/* ---------- feed ---------- */
+.feed{flex:1;min-height:0;display:flex;flex-direction:column;padding:2px var(--gutter) 0}
+.filters{display:flex;gap:8px;justify-content:center;margin:2px 0 10px}
+.filters .chip{padding:5px 16px;font-size:13px}
+.review-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;font-size:14px;font-weight:600}
+.review-bar .link{margin:0;padding:10px 4px}
+.crownbar{display:flex;align-items:center;gap:10px;background:rgba(244,194,77,.14);border-radius:12px;padding:6px 6px 6px 12px;margin:0 0 10px;color:var(--gold-text);font-size:13.5px;font-weight:600}
+.crownbar span{flex:1;min-width:0}
+.crownbar .go{background:var(--gold);color:var(--gold-ink);border:0;border-radius:10px;font-weight:700;font-size:13px;padding:6px 12px;min-height:44px}
+.crownbar .x{background:none;border:0;color:var(--muted);width:44px;height:44px;font-size:19px;line-height:1}
+.stack{position:relative;flex:1;min-height:0;container-type:size}
+/* portrait card: 4:5, never wider than the column, never stretched */
+.deck{position:absolute;inset:0;margin:auto;width:min(100cqw, 80cqh);height:min(100cqh, 150cqw)}
+.card{position:absolute;inset:0;border-radius:20px;overflow:hidden;background:var(--surface-2);touch-action:none;will-change:transform}
+.card.under{transform:scale(.96) translateY(10px);opacity:.5}
+.card .photo{position:absolute;inset:0;background-size:cover;background-position:center 30%}
+.card .bars{position:absolute;top:10px;left:14px;right:14px;display:flex;gap:4px;z-index:2}
+.card .bars i{flex:1;height:3px;border-radius:9px;background:rgba(255,255,255,.4)}
+.card .bars i.on{background:#fff}
+.glass{background:rgba(12,9,10,.58)}
+.card .kb{position:absolute;top:22px;left:14px;z-index:2;white-space:nowrap;color:#FFE08A;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:600}
+.card .more{position:absolute;top:14px;right:10px;z-index:3;width:44px;height:44px;border:0;border-radius:50%;color:#fff;font-size:18px;line-height:1}
+.card .sample{position:absolute;top:24px;right:62px;z-index:2;background:rgba(12,9,10,.58);color:#E9DFD8;font-size:10px;font-weight:600;padding:3px 9px;border-radius:99px}
+.card .info{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:72px 16px 16px;color:#fff;background:linear-gradient(transparent,rgba(10,8,9,.6) 30%,rgba(10,8,9,.92))}
+.card .name{font-size:28px;font-weight:800;line-height:1.05;letter-spacing:-.01em}
+.card .college{font-size:14px;color:rgba(255,244,232,.82);margin:3px 0 10px}
+.card .row{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.card .t{font-size:12px;font-weight:500;background:rgba(255,244,232,.16);border-radius:99px;padding:4px 10px}
+.card .nd{display:inline-flex;gap:5px;align-items:center;font-size:12.5px;font-weight:500}
+.card .nd i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.card .pr{background:#FFF4E8;color:#1E1714;border-radius:14px 14px 14px 4px;padding:8px 12px;margin:0 0 12px;font-size:15px;font-weight:600;line-height:1.3;max-width:92%}
+.card .pr small{display:block;font-size:11px;font-weight:500;color:#66584F}
+.stamp{position:absolute;top:96px;z-index:4;font-size:30px;font-weight:800;padding:2px 12px;border:4px solid;border-radius:12px;opacity:0;pointer-events:none;letter-spacing:.04em}
+.stamp.yes{left:18px;color:#5BF09A;border-color:#5BF09A;transform:rotate(-14deg)}
+.stamp.no{right:18px;color:#FF6B74;border-color:#FF6B74;transform:rotate(14deg)}
+.buttons{flex:none;display:flex;justify-content:center;align-items:center;gap:30px;padding:14px 0 12px}
+.round{width:62px;height:62px;border-radius:50%;border:0;background:var(--surface-2);color:var(--text);display:grid;place-items:center;transition:transform .1s}
+.round:active{transform:scale(.94)}
+.round.yes{background:var(--orange);color:var(--orange-ink);width:72px;height:72px}
+.round.yes svg{width:28px;height:28px}
+.round svg{width:26px;height:26px}
+.feed-empty{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;text-align:center;padding:10px 8px;gap:10px}
+.feed-empty .btn + .btn{margin-top:0}
+
+/* ---------- lists ---------- */
+.list{display:grid;gap:10px}
+.row-card{display:flex;align-items:flex-start;gap:12px;border-radius:16px;background:var(--surface);padding:12px}
+.row-card > img{width:58px;height:72px;border-radius:12px;object-fit:cover;flex:none;background:var(--surface-2)}
+.row-card .grow{flex:1;min-width:0}
+.row-card .grow > b{display:block;font-size:15.5px;font-weight:600}
+.row-card .small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-card{flex-wrap:wrap}
+.mbtns{flex-basis:100%;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;align-items:center;gap:8px}
+.mbtns .sbtn{justify-content:center;text-align:center}
+.mbtns .status{text-align:center}
+.sbtn{border:0;border-radius:10px;background:var(--surface-2);color:var(--text);font-size:13.5px;font-weight:600;padding:6px 14px;min-height:44px;text-decoration:none;display:inline-flex;align-items:center}
+.sbtn.pri{background:var(--orange);color:var(--orange-ink)}
+.sbtn[disabled]{opacity:.55}
+.status{font-size:12.5px;color:var(--muted);font-weight:500}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--surface-2);border-radius:12px;margin:4px 0 14px}
+.tabs button{border:0;background:none;color:var(--muted);border-radius:9px;min-height:44px;font-weight:600;font-size:14px}
+.tabs button[aria-selected=true]{background:var(--surface);color:var(--text)}
+.tabs.tabs3{grid-template-columns:repeat(3,1fr)}
+
+/* ---------- leaderboard (unchanged layout) ---------- */
+.board-title{font-family:var(--display);font-weight:400;font-size:clamp(36px,10vw,44px);line-height:1;color:var(--gold-text);text-align:center;margin:6px 0 4px}
+.board-when{text-align:center;color:var(--muted);font-size:13px;margin:0 0 14px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.seg button{border:0;background:none;color:var(--muted);border-radius:11px;min-height:44px;font-weight:600;font-size:14px}
+.seg button[aria-pressed=true]{background:var(--surface-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line-2)}
+.seg.sm button{min-height:44px;font-size:13px}
+.seg + .seg{margin-top:8px}
+.podium{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.18fr) minmax(0,1fr);align-items:end;gap:10px;margin:22px 0 12px}
+.pod{text-align:center;min-width:0}
+.pod img{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:999px 999px 16px 16px;display:block;background:var(--surface-2);box-shadow:0 0 0 2px rgba(244,194,77,.45)}
+.pod.p1 img{box-shadow:0 0 0 3px var(--gold),0 0 34px -4px rgba(244,194,77,.55)}
+.pod .rk{display:inline-grid;place-items:center;margin-top:-16px;position:relative;background:linear-gradient(180deg,var(--gold-2),var(--gold));color:var(--gold-ink);border:3px solid var(--night);border-radius:99px;font-weight:800;font-size:13px;min-width:34px;height:30px;padding:0 8px}
+.pod b,.pod span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pod b{font-size:14px;margin-top:4px;font-weight:600}
+.pod span{font-size:11.5px;color:var(--muted)}
+.lb-row{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--line)}
+.lb-row .n{width:22px;font-weight:700;color:var(--gold-text);text-align:center;font-variant-numeric:tabular-nums}
+.lb-row img{width:42px;height:42px;border-radius:50%;object-fit:cover}
+.lb-row .me{margin-left:auto;font-size:10.5px;font-weight:700;background:var(--orange);color:var(--orange-ink);border-radius:99px;padding:2px 9px}
+.mycard{border:1px solid rgba(244,194,77,.4);border-radius:18px;background:linear-gradient(160deg,rgba(244,194,77,.16),rgba(244,194,77,.03));padding:14px 16px;margin-top:16px}
+.mycard b{font-size:16px}
+.stitch{outline:1px dashed rgba(244,194,77,.32);outline-offset:-6px}
+
+/* ---------- me (unchanged layout) ---------- */
+.preview{position:relative;width:min(58vw,230px);aspect-ratio:4/5;margin:6px auto}
+.preview .card{border-radius:min(42%,170px) min(42%,170px) 26px 26px / min(30%,150px) min(30%,150px) 26px 26px;box-shadow:0 26px 50px -20px rgba(0,0,0,.6),0 0 0 1px var(--line)}
+.preview .card::after{content:"";position:absolute;inset:7px;border-radius:inherit;border:1px solid rgba(244,194,77,.28);pointer-events:none;z-index:3}
+.preview .card .kb{top:26px;left:50%;transform:translateX(-50%)}
+.preview .card .bars{left:32%;right:32%}
+.preview .card .name{font-size:20px}
+.preview .card .info{padding:40px 12px 12px}
+.menu{display:grid;gap:10px;margin-top:16px}
+.menu .btn + .btn{margin-top:0}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:10px 14px;font-weight:500;font-size:14.5px;min-height:56px}
+.switch{position:relative;width:52px;height:30px;flex:none}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.switch i{position:absolute;inset:0;background:var(--surface-2);border-radius:99px;transition:.2s;border:1px solid var(--line-2)}
+.switch i:before{content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;background:var(--text);border-radius:50%;transition:.2s}
+.switch input:checked + i{background:var(--orange);border-color:var(--orange)}
+.switch input:checked + i:before{transform:translateX(22px);background:var(--orange-ink)}
+.cardlist{display:grid;border:1px solid var(--line);border-radius:18px;background:var(--surface);overflow:hidden}
+.cardlist button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;color:var(--text);padding:12px 14px;min-height:58px}
+.cardlist button:first-child{border-top:0}
+.cardlist b{display:block;font-size:14.5px;font-weight:600}
+.cardlist .d{font-size:12.5px;color:var(--muted)}
+.cardlist .st{margin-left:auto;font-size:12.5px;font-weight:600;color:var(--muted);flex:none}
+.cardlist .st.add{color:var(--accent-text)}
+.cardlist .grow{flex:1;min-width:0}
+
+/* ---------- overlays & sheets ---------- */
+.overlay{position:absolute;inset:0;z-index:50;color:var(--text);display:flex;flex-direction:column;animation:fade .25s;background:var(--night)}
+.overlay .body{padding-top:4px}
+.match-pics{display:flex;justify-content:center;margin:10px 0 14px}
+.match-pics img{width:min(38%,170px);aspect-ratio:4/5;object-fit:cover;border-radius:18px;box-shadow:0 0 0 3px var(--gold);background:var(--surface-2)}
+.match-pics img:first-child{transform:rotate(-5deg) translateX(10px)}
+.match-pics img:last-child{transform:rotate(5deg) translateX(-10px)}
+.overlay h1{font-family:var(--display);font-weight:400;color:var(--gold-text);text-align:center;font-size:clamp(40px,11.5vw,54px);line-height:1;margin:8px 0}
+.overlay .sub{text-align:center}
+.overlay .link{color:var(--muted)}
+.sheet-bg{position:absolute;inset:0;z-index:60;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;animation:fade .15s}
+.sheet{width:100%;max-width:calc(var(--col) + 40px);max-height:92%;overflow-y:auto;overscroll-behavior:contain;background:var(--surface);border-radius:24px 24px 0 0;padding:10px 20px calc(env(safe-area-inset-bottom, 0px) + 18px);animation:up .24s ease-out;box-shadow:0 -12px 40px -20px rgba(0,0,0,.5)}
+.sheet .grab{width:42px;height:5px;background:var(--line-2);border-radius:9px;margin:2px auto 14px}
+.sheet .q{margin-top:14px}
+.sheet .btn.ghost{background:var(--surface-2)}
+.sharetext{white-space:pre-wrap;word-break:break-all;background:var(--surface-2);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.5;margin:4px 0 12px}
+.linkbox{display:flex;align-items:center;gap:8px;background:var(--surface-2);border-radius:12px;padding:6px 6px 6px 14px;margin:6px 0 12px}
+.linkbox code{flex:1;min-width:0;font-family:inherit;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg{background:var(--orange-soft);border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:15px;line-height:1.4;margin:6px 0 12px 12%}
+.why{display:flex;align-items:center;justify-content:center;gap:6px;margin:0 0 8px;font-size:13px;font-weight:500;color:var(--muted);text-align:center}
+.why .ic{flex:none;font-size:12px}
+.divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12.5px;font-weight:600;margin:18px 0 8px}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line-2)}
+.examples{display:grid;gap:8px;margin:4px 0 16px}
+.examples .pr{background:var(--surface-2);border-radius:14px 14px 14px 4px;padding:8px 12px;font-size:14.5px;font-weight:600;line-height:1.3}
+.examples .pr small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+.poster{display:block;max-width:100%;max-height:min(52vh,460px);margin:6px auto 14px;border-radius:14px;box-shadow:0 0 0 1px var(--line)}
+#toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top, 0px) + 64px);transform:translateX(-50%) translateY(-16px);background:var(--text);color:var(--night);padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:86vw;text-align:center;box-shadow:0 12px 30px -12px rgba(0,0,0,.6)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.spinner{width:34px;height:34px;border:4px solid var(--surface-2);border-top-color:var(--orange);border-radius:50%;animation:spin .8s linear infinite;margin:30px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lookup{display:flex;flex-direction:column;justify-content:center;min-height:100%}
+.lookup .spinner{margin:0 0 18px}
+
+/* ---------- peek mode (guests) ---------- */
+.card .photo.blur{filter:blur(16px) saturate(1.3);transform:scale(1.35)}
+.lockpill{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);z-index:4;padding:8px 14px;display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:13px;font-weight:600;color:#fff;white-space:nowrap}
+.actions .note{font-size:12.5px;color:var(--muted);text-align:center;margin:8px 0 0}
+
+/* ---------- Navratri motifs (board header, match screen, progress) ---------- */
+.toran{flex:none;height:44px;margin-top:-4px;background:var(--toran) repeat-x center top / 66px 44px;pointer-events:none}
+.overlay .toran{margin-top:0}
+.beads{flex:none;display:flex;align-items:center;justify-content:center;gap:6px;margin:4px var(--gutter) 8px}
+.beads::before,.beads::after{content:"";flex:1;height:1px;background:var(--line)}
+.beads i{width:9px;height:9px;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 1.5px var(--line-2);transition:.3s}
+.beads i.on{background:var(--c);box-shadow:none}
+.beads i.now{width:12px;height:12px;background:var(--c);box-shadow:none}
+/* two dandiya sticks: lacquer bands, brass caps, tassels with bells; they swing in and cross */
+.clash{display:block;width:112px;height:auto;margin:0 auto -4px;overflow:visible}
+.clash .stk{transform-box:fill-box;transform-origin:50% 43.85%}
+.clash .stk.l{transform:rotate(-36deg);animation:stkL .6s cubic-bezier(.3,1.5,.5,1) both}
+.clash .stk.r{transform:rotate(36deg);animation:stkR .6s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes stkL{from{transform:translate(-30px,6px) rotate(-72deg)}to{transform:rotate(-36deg)}}
+@keyframes stkR{from{transform:translate(30px,6px) rotate(72deg)}to{transform:rotate(36deg)}}
+.clash .spark{transform-box:fill-box;transform-origin:center;animation:spark .6s .45s ease-out both}
+@keyframes spark{from{transform:scale(0);opacity:0}50%{opacity:1}to{transform:scale(1.5);opacity:.9}}
+@media (max-height:700px){ .clash{width:78px} .match-pics img{width:min(30%,124px)} .overlay h1{font-size:clamp(34px,10vw,44px);margin:4px 0} }
+.petals{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2}
+.petal{position:absolute;top:-24px;width:12px;height:18px;border-radius:60% 60% 60% 60% / 80% 80% 40% 40%;opacity:.9;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(540deg)}}
+@keyframes fade{from{opacity:0}}
+@keyframes up{from{transform:translateY(40px);opacity:.4}}
+.enter{animation:enter .22s ease-out}
+@keyframes enter{from{opacity:0;transform:translateX(14px)}}
+@media (max-height:740px){ h1.display{font-size:clamp(32px,9.5vw,40px)} .garba-art{max-width:300px} }
+@media (max-height:660px){ .garba-art{max-width:230px} .card .sample{display:none} }
+@media (max-height:680px){
+  h1{margin:6px 0 4px}
+  .q{margin-top:12px}
+  .btn{min-height:50px}
+  .round{width:56px;height:56px}.round.yes{width:64px;height:64px}
+}
+/* ---------- accessibility ---------- */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+/* =====================================================================
+   STICK TOGETHER · Picapool Dandiya partner match · build __BUILD__
+   One file. MODE 'demo' runs fully in the browser on sample profiles.
+   MODE 'live' talks to the backend at API_BASE (server/ in the handoff).
+   Everything tech needs to edit is in CONFIG.
+   ===================================================================== */
+const CONFIG = {
+  MODE: 'demo',                  // 'demo' | 'live'
+  API_BASE: '/api',              // live mode: same-origin when served by server/server.js
+  BUILD: '__BUILD__',
+  PRODUCT: 'Stick Together',
+  BOARD_NAME: { female: 'Garba Queen', male: 'Garba King' },
+  DAILY_RIGHT_CAP: 40,           // must match server DAILY_RIGHT_CAP
+  OTP_LENGTH: 4,                 // must match server OTP_LENGTH
+  CHAT_ENABLED: true,            // false = matches can only share numbers (if the Picapool chat API isn't ready)
+  POLL_MS: 45000,                // live: check for new matches this often while the app is open
+  DELETE_ON: '2026-10-20',       // Dandiya profiles auto-delete on this date
+  SHARE_URL: 'https://dandiya.picapool.tech',
+  APP_DEEPLINK: 'picapool://chat/{chatId}',                                   // TODO tech
+  PLAY_STORE: 'https://play.google.com/store/apps/details?id=REPLACE_ME',      // TODO tech
+  APP_STORE: 'https://apps.apple.com/app/REPLACE_ME',                          // TODO tech
+  // Navratri 2026 (Delhi calendar). Past nights hide automatically.
+  NIGHTS: [
+    {id:'d1', date:'2026-10-11', day:'Sun', colour:'Orange',        hex:'#F7821B', emoji:'🟠'},
+    {id:'d2', date:'2026-10-12', day:'Mon', colour:'White',         hex:'#FFFFFF', emoji:'⚪'},
+    {id:'d3', date:'2026-10-13', day:'Tue', colour:'Red',           hex:'#E0343F', emoji:'🔴'},
+    {id:'d4', date:'2026-10-14', day:'Wed', colour:'Royal blue',    hex:'#2346C8', emoji:'🔵'},
+    {id:'d5', date:'2026-10-15', day:'Thu', colour:'Yellow',        hex:'#FFD21F', emoji:'🟡'},
+    {id:'d6', date:'2026-10-16', day:'Fri', colour:'Green',         hex:'#1FA34A', emoji:'🟢'},
+    {id:'d7', date:'2026-10-17', day:'Sat', colour:'Grey',          hex:'#9AA0A6', emoji:'🔘'},
+    {id:'d8', date:'2026-10-18', day:'Sun', colour:'Purple',        hex:'#7A3BD1', emoji:'🟣'},
+    {id:'d9', date:'2026-10-19', day:'Mon', colour:'Peacock green', hex:'#0E9A8C', emoji:'🦚'},
+  ],
+  // TODO Purav: replace with the real events North Campus goes to
+  VENUES: ['Main North Campus event', 'College garba', 'Society / PG garba', 'Still deciding'],
+  MAX_PHOTOS: 5,                 // must match server MAX_PHOTOS
+  GUEST_PEEK_LIMIT: 5,           // guests see at most this many distinct people before making a card
+  BOARD_SIZE: 20,                // top N per board get crowned; must match server BOARD_SIZE
+  // North Campus colleges. Guys only see COLLEGES_COED; girls see both lists. Anything else: "Other college" + type it.
+  COLLEGES_COED: ['Hansraj College','Hindu College','Kirori Mal College','Ramjas College','SGTB Khalsa College',
+                  'Shri Ram College of Commerce',"St. Stephen's College",'Faculty of Law','DU department / DSE'],
+  COLLEGES_WOMEN: ['Daulat Ram College','Indraprastha College for Women','Miranda House'],
+};
+const OTHER_COLLEGE = '__other';
+const collegesFor = gender => [...CONFIG.COLLEGES_COED, ...(gender === 'female' ? CONFIG.COLLEGES_WOMEN : [])].sort((a, b) => a.localeCompare(b));
+
+const OPTIONS = {
+  skill:  [['learning','Still learning'],['hold','I can hold my own'],['main','Circle main character']],
+  prompt: [['anthem','My garba anthem is'],['teach',"I'll teach you"],['find','Find me near the'],['flag','Dandiya green flag']],
+};
+const label = (group, id) => (OPTIONS[group].find(o => o[0] === id) || [,''])[1];
+const SKILL_LEVEL = {learning:0, hold:1, main:2};
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ---------------- helpers ---------------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+};
+const todayISO = () => { try { return new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Kolkata'}).format(new Date()); } catch (e) { return new Date().toISOString().slice(0,10); } };
+const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const rng = seed => { let a = hash(seed); return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+const shuffle = (arr, seed) => { const r = rng(seed), a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const nightById = id => CONFIG.NIGHTS.find(n => n.id === id);
+const upcomingNights = () => CONFIG.NIGHTS.filter(n => n.date >= todayISO());
+const tonight = () => upcomingNights()[0] || CONFIG.NIGHTS[CONFIG.NIGHTS.length - 1];
+const fmtDate = n => `${n.day} ${+n.date.slice(8)}`;
+const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+const hexA = (hex, a) => `rgba(${rgb(hex).join(',')},${a})`;
+const lum = hex => { const [r, g, b] = rgb(hex).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + .05) / (y + .05); };
+const onColor = hex => contrast(hex, '#161214') >= contrast(hex, '#FFF4E8') ? '#161214' : '#FFF4E8';
+/* selected night chip: the night's colour, deepened just enough for 4.5:1 text (only Red needs it) */
+const chipBg = hex => { let h = hex; for (let k = 0; k < 12 && contrast(h, onColor(h)) < 4.5; k++) h = '#' + rgb(h).map(v => Math.round(v * .94).toString(16).padStart(2, '0')).join(''); return h; };
+const nightVars = hex => { const b = chipBg(hex); return `--c:${hex};--cb:${b};--on:${onColor(b)}`; };
+const boardFor = g => CONFIG.BOARD_NAME[g === 'female' ? 'female' : 'male'];
+const other = g => g === 'female' ? 'male' : 'female';
+const isDemo = () => CONFIG.MODE !== 'live';
+const TOP = (() => { try { return window.self === window.top; } catch (e) { return false; } })();
+const buzz = ms => { if (!TOP) return; try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+const canClipboard = () => { try { if (!navigator.clipboard || !window.isSecureContext) return false; const fp = document.permissionsPolicy || document.featurePolicy; return !fp || fp.allowsFeature('clipboard-write'); } catch (e) { return false; } };
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ---------------- day / night theme: night by default, remembered on this phone ---------------- */
+const THEME_KEY = 'st_theme';
+const getTheme = () => store.get(THEME_KEY, 'night') === 'day' ? 'day' : 'night';
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', t === 'day' ? '#FFF8F0' : '#161214');
+}
+function themeBtn() {
+  const day = getTheme() === 'day';
+  return `<button class="theme-btn" id="themeBtn" aria-pressed="${day}" aria-label="Day mode">${day ? IC.sun : IC.moon}</button>`;
+}
+function toggleTheme() {
+  const t = getTheme() === 'day' ? 'night' : 'day'; store.set(THEME_KEY, t); applyTheme(t);
+  $$('#themeBtn').forEach(b => { b.setAttribute('aria-pressed', t === 'day'); b.innerHTML = t === 'day' ? IC.sun : IC.moon; });
+}
+document.addEventListener('click', e => { if (e.target.closest('#themeBtn')) toggleTheme(); });
+
+/* ---------------- state ---------------- */
+const KEY = 'st_v4';
+const freshState = () => ({
+  sessionId: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+  token: null, phone: '', user: null, profile: null, draft: {}, ref: null, entry: null, step: null,
+  swipes: {}, rightsByDay: {}, matches: [], blocked: [], seenMatchIds: [], ageBlocked: false, crown: null, crownHidden: null, guest: null, loginOnly: false,
+  picapool: null,     // result of the Picapool account lookup after OTP: 'found' | 'not_found' | 'unavailable'
+  feedSwipes: 0, lineAsked: false, dismissed: [],
+});
+let S = Object.assign(freshState(), store.get(KEY, {}));
+const save = () => store.set(KEY, S);
+(function captureRef() {
+  let u; try { u = new URL(location.href); } catch (e) { return; }
+  if (u.searchParams.has('new')) {
+    store.del(KEY); store.del('st_mock'); S = freshState();
+    u.searchParams.delete('new');
+    try { history.replaceState(null, '', u.pathname + (u.search || '') + u.hash); } catch (e) {}
+  }
+  const seg = (u.pathname.split('/').filter(Boolean)[0] || '');
+  const ref = u.searchParams.get('ref') || u.searchParams.get('r') || (seg && !seg.includes('.') ? seg : null);
+  if (ref && !S.ref) { S.ref = ref.slice(0, 40); S.entry = location.href.slice(0, 200); save(); }
+})();
+const myRefSlug = () => 'st-' + String(S.user?.id || S.sessionId).slice(-8);
+const shareLink = () => `${CONFIG.SHARE_URL}?ref=${myRefSlug()}`;
+
+/* ---------------- tracking (live only, never logs to console) ---------------- */
+function track(event, data = {}) {
+  if (isDemo()) return;
+  const payload = JSON.stringify({event, data, sessionId: S.sessionId, ref: S.ref, build: CONFIG.BUILD, ts: new Date().toISOString()});
+  try {
+    if (navigator.sendBeacon && navigator.sendBeacon(CONFIG.API_BASE + '/events', new Blob([payload], {type: 'text/plain'}))) return;
+    fetch(CONFIG.API_BASE + '/events', {method: 'POST', body: payload, headers: {'Content-Type': 'text/plain'}, keepalive: true}).catch(() => {});
+  } catch (e) {}
+}
+
+/* =====================================================================
+   API LAYER. The UI only calls `api`. Contract: HANDOFF.md §5.
+   ===================================================================== */
+class LiveApi {
+  async req(method, path, body) {
+    let res;
+    try {
+      res = await fetch(CONFIG.API_BASE + path, {
+        method, headers: {'Content-Type': 'application/json', ...(S.token ? {Authorization: 'Bearer ' + S.token} : {})},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) { throw new Error('No internet. Check your connection and try again.'); }
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 401 && S.token) { S = Object.assign(freshState(), {ref: S.ref, entry: S.entry}); save(); setTimeout(() => go('landing'), 0); throw new Error('Please log in again.'); }
+    if (!res.ok) { const err = new Error(json.message || 'Something went wrong. Try again.'); err.code = json.code; throw err; }
+    return json;
+  }
+  getPreview(gender, nights)     { return this.req('GET', `/preview?gender=${gender}&nights=${encodeURIComponent(nights.join(','))}`); }
+  sendOtp(phone)                 { return this.req('POST', '/auth/otp', {phone}); }
+  verifyOtp(phone, code)         { return this.req('POST', '/auth/verify', {phone, code, ref: S.ref, entry: S.entry, sessionId: S.sessionId}); }
+  lookupPicapool()               { return this.req('POST', '/picapool/lookup', {}); }
+  saveAccount(acc)               { return this.req('POST', '/account', acc); }
+  recordAgeBlock()               { return this.req('POST', '/age-block', {}); }
+  saveProfile(p)                 { return this.req('PUT', '/profile', p); }
+  getFeed(opts)                  { return this.req('GET', '/feed?all=' + (opts.allNights ? 1 : 0) + (opts.passed ? '&passed=1' : '')); }
+  swipe(targetId, dir)           { return this.req('POST', '/swipe', {targetId, dir}); }
+  getMatches()                   { return this.req('GET', '/matches'); }
+  getSentLikes()                 { return this.req('GET', '/likes/sent'); }
+  getReceivedLikes()             { return this.req('GET', '/likes/received'); }
+  dismissLike(targetId)          { return this.req('POST', '/likes/dismiss', {targetId}); }
+  openChat(matchId, opener)      { return this.req('POST', `/matches/${encodeURIComponent(matchId)}/chat`, {opener}); }
+  shareNumber(matchId)           { return this.req('POST', `/matches/${encodeURIComponent(matchId)}/share-number`, {}); }
+  getLeaderboard(board, period)  { return this.req('GET', `/leaderboard?board=${board}&period=${period}`); }
+  setLeaderboard(optIn)          { return this.req('POST', '/leaderboard/opt', {optIn}); }
+  report(targetId, reason)       { return this.req('POST', '/report', {targetId, reason}); }
+  block(targetId)                { return this.req('POST', '/block', {targetId}); }
+  deleteProfile()                { return this.req('DELETE', '/profile'); }
+}
+
+/* ---- demo backend: sample people, all in this browser ---- */
+const FEMALE_NAMES = ['Ananya','Ishita','Riya','Kavya','Sneha','Tanvi','Aditi','Meher','Simran','Diya','Khushi','Nandini','Pooja','Saanvi','Avni','Jhanvi','Muskan','Prisha','Radhika','Tara'];
+const MALE_NAMES = ['Arjun','Kabir','Rohan','Aarav','Vihaan','Dev','Ishaan','Karan','Aditya','Siddharth','Yash','Rahul','Nikhil','Harsh','Pranav','Varun','Ayush','Kunal','Manav','Raghav'];
+const SAMPLE_LINES = {anthem: ['Chogada Tara','Nagada Sang Dhol','Pankhida','Udi Udi Jaye','Dholida'], teach: ['the 3-clap step','how not to hit your partner','Garba in 10 minutes'],
+  find: ['dhol','food stalls','photo booth'], flag: ['Shows up on time','Brings spare sticks','Dances even to the slow songs']};
+function sampleAvatar(c1, c2, seed) {
+  const r = rng(seed); const hx = 40 + Math.floor(r() * 30);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500"><defs><radialGradient id="g" cx=".5" cy=".28" r=".95"><stop offset="0" stop-color="${c1}"/><stop offset=".55" stop-color="${c2}"/><stop offset="1" stop-color="#1A0F24"/></radialGradient>
+  <pattern id="p" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="11" cy="11" r="2" fill="#fff" opacity=".16"/></pattern></defs>
+  <rect width="400" height="500" fill="url(#g)"/><rect width="400" height="500" fill="url(#p)"/>
+  <circle cx="200" cy="${200 + hx / 4}" r="${70 + hx / 8}" fill="#170D1F" opacity=".92"/><ellipse cx="200" cy="520" rx="175" ry="${150 + hx}" fill="#170D1F" opacity=".92"/></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+class MockApi {
+  constructor() {
+    this.db = store.get('st_mock', {users: {}});
+    const nights = upcomingNights().length ? upcomingNights() : CONFIG.NIGHTS.slice(-5);
+    const soft = h => h === '#FFFFFF' ? '#F2C9A8' : h;
+    const mk = (names, gender) => names.map((name, i) => {
+      const r = rng(gender + name);
+      const ns = nights.filter(() => r() < 0.45); if (!ns.length) ns.push(nights[Math.floor(r() * nights.length)]);
+      const pick = g => OPTIONS[g][Math.floor(r() * OPTIONS[g].length)][0];
+      const pid = pick('prompt');
+      const cols = collegesFor(gender);
+      return { id: `${gender[0]}${i}`, sample: true, name, gender, college: cols[Math.floor(r() * cols.length)],
+        nights: ns.map(n => n.id), venue: CONFIG.VENUES[Math.floor(r() * CONFIG.VENUES.length)],
+        prompt: r() < 0.85 ? {id: pid, text: SAMPLE_LINES[pid][Math.floor(r() * SAMPLE_LINES[pid].length)]} : null,
+        inBoard: r() < 0.8, hasPicapool: r() < 0.5, // about half the sample people "have" Picapool, so both chat paths can be tried
+        photos: [sampleAvatar(soft(ns[0].hex), soft(ns[ns.length - 1].hex), name), sampleAvatar('#FF6B22', '#2346C8', name + '2')],
+        week: 6 + Math.floor(r() * 46), tonight: 1 + Math.floor(r() * 14) };
+    });
+    this.people = [...mk(FEMALE_NAMES, 'female'), ...mk(MALE_NAMES, 'male')];
+  }
+  persist() { store.set('st_mock', this.db); }
+  likesMe(p) { return rng(p.id + S.phone)() < 0.42; }
+  async getPreview(gender, nights) {
+    await sleep(250);
+    const list = this.people.filter(p => p.gender === gender && (!nights.length || p.nights.some(n => nights.includes(n))));
+    const top = list.filter(p => p.inBoard).sort((a, b) => b.tonight - a.tonight || a.id.localeCompare(b.id)); // same order as tonight's board
+    return {profiles: [...top, ...shuffle(list.filter(p => !p.inBoard), todayISO())].slice(0, CONFIG.GUEST_PEEK_LIMIT).map(p => ({id: p.id, name: p.name, college: p.college, nights: p.nights, prompt: p.prompt, thumb: p.photos[0], sample: true}))};
+  }
+  /* the demo never talks to Picapool: every demo login is "no Picapool account found" */
+  async lookupPicapool() { await sleep(900); return {status: 'not_found'}; }
+  async sendOtp() { await sleep(450); return {ok: true}; }
+  async verifyOtp(phone, code) {
+    await sleep(450);
+    if (String(code).length !== CONFIG.OTP_LENGTH) throw new Error('Enter the full code.');
+    const u = this.db.users[phone];
+    return {token: 'demo-' + phone, user: u ? u.user : null, profile: u ? u.profile : null};
+  }
+  async saveAccount(acc) { await sleep(250); const user = {id: 'u' + hash(S.phone), ...acc}; this.db.users[S.phone] = {user, profile: null}; this.persist(); return {user}; }
+  async recordAgeBlock() { return {ok: true}; }
+  async saveProfile(p) {
+    await sleep(350);
+    if ((p.photos || []).length > CONFIG.MAX_PHOTOS) throw new Error(`Up to ${CONFIG.MAX_PHOTOS} photos.`);
+    const old = this.db.users[S.phone]?.profile;
+    p = {...p, inBoard: p.inBoard === undefined ? (old ? !!old.inBoard : true) : !!p.inBoard};
+    (this.db.users[S.phone] ||= {user: S.user}).profile = p; this.persist(); return {profile: p};
+  }
+  async getFeed({allNights, passed}) {
+    await sleep(250);
+    const me = S.profile, now = Date.now();
+    if (passed) return {profiles: this.people.filter(p => p.gender === other(S.user.gender) && !S.blocked.includes(p.id) && S.swipes[p.id]?.dir === 'left'), rightsLeftToday: localRightsLeft()};
+    const pool = this.people.filter(p => p.gender === other(S.user.gender) && !S.blocked.includes(p.id) && (() => {
+      const s = S.swipes[p.id]; if (!s) return true;
+      return s.dir === 'left' && !s.retried && now - s.at > 24 * 3600e3;
+    })());
+    const list = allNights ? pool : pool.filter(p => p.nights.some(n => me.nights.includes(n)));
+    return {profiles: rankFeed(me, list, S.user.id || S.sessionId), rightsLeftToday: localRightsLeft()};
+  }
+  async swipe(targetId, dir) {
+    await sleep(120);
+    const p = this.people.find(x => x.id === targetId);
+    let match = null;
+    if (dir === 'right' && p && this.likesMe(p)) match = {id: 'm-' + targetId, person: p, createdAt: Date.now(), chatId: null, numberStatus: 'none',
+      chatRequest: p.hasPicapool && rng(p.id + 'req')() < 0.4 ? 'received' : null}; // some sample people already wrote to you
+    return {match, rightsLeftToday: localRightsLeft()};
+  }
+  async getMatches() { return {matches: S.matches}; }
+  async getReceivedLikes() {
+    await sleep(200);
+    const received = this.people.filter(p => p.gender === other(S.user.gender) && this.likesMe(p) && S.swipes[p.id]?.dir !== 'right'
+      && !(S.dismissed || []).includes(p.id) && !S.blocked.includes(p.id)).map(p => ({person: p, at: Date.now(), passed: S.swipes[p.id]?.dir === 'left'}));
+    return {received};
+  }
+  async dismissLike(id) { await sleep(150); S.dismissed = [...new Set([...(S.dismissed || []), id])]; save(); return {ok: true}; }
+  async getSentLikes() {
+    await sleep(200);
+    const matched = new Set(S.matches.map(m => m.person.id));
+    const sent = Object.entries(S.swipes).filter(([id, s]) => s.dir === 'right' && !matched.has(id)).sort((a, b) => b[1].at - a[1].at)
+      .map(([id, s]) => ({person: this.people.find(p => p.id === id), at: s.at})).filter(x => x.person && !S.blocked.includes(x.person.id));
+    return {sent};
+  }
+  async openChat(matchId) {
+    await sleep(300);
+    if (!S.user?.hasPicapool) { const e = new Error('Set up Picapool first.'); e.code = 'need_account'; throw e; }
+    const m = S.matches.find(x => x.id === matchId);
+    if (m && !m.person.hasPicapool && m.chatRequest !== 'received') return {status: 'requested'};
+    const chatId = 'demo-' + matchId; return {status: 'created', chatId, deepLink: CONFIG.APP_DEEPLINK.replace('{chatId}', chatId)};
+  }
+  async shareNumber(matchId) {
+    await sleep(350);
+    return rng(matchId + 'num')() < 0.6 ? {status: 'shared', phone: '98' + String(hash(matchId)).slice(0, 8).padEnd(8, '0')} : {status: 'waiting'};
+  }
+  async getLeaderboard(board, period) {
+    await sleep(220);
+    const g = board === 'queen' ? 'female' : 'male', key = period === 'tonight' ? 'tonight' : 'week';
+    const rows = this.people.filter(p => p.gender === g && p.inBoard).map(p => ({id: p.id, name: p.name, college: p.college, photo: p.photos[0], count: p[key], tie: p.id}));
+    let me = null;
+    if (S.user && S.profile && S.user.gender === g && S.profile.inBoard) {
+      const count = (key === 'week' ? 34 : 11) + this.people.filter(p => p.gender !== g && this.likesMe(p)).length;
+      rows.push({id: 'me', name: S.user.firstName, college: S.user.college, photo: S.profile.photos[0], count, isMe: true});
+      me = {count};
+    }
+    rows.sort((a, b) => b.count - a.count || String(a.tie || '').localeCompare(String(b.tie || '')));
+    if (me) { const i = rows.findIndex(r => r.isMe); me.rank = i < CONFIG.BOARD_SIZE ? i + 1 : null; }
+    return {top: rows.slice(0, CONFIG.BOARD_SIZE).map(({count, ...r}) => r), me};
+  }
+  async setLeaderboard() { return {ok: true}; }
+  async report() { await sleep(200); return {ok: true}; }
+  async block() { return {ok: true}; }
+  async deleteProfile() { await sleep(300); if (this.db.users[S.phone]) this.db.users[S.phone].profile = null; this.persist(); return {ok: true}; }
+}
+/* feed order: same night + venue > same night > skill within 1 > rest; seeded shuffle inside each tier (server does the same) */
+function rankFeed(me, list, seed) { // null-safe: venue and skill are optional
+  const tier = p => {
+    const night = p.nights.some(n => me.nights.includes(n));
+    if (night && p.venue && p.venue === me.venue) return 0;
+    if (night) return 1;
+    if (Math.abs((SKILL_LEVEL[p.skill] ?? 1) - (SKILL_LEVEL[me.skill] ?? 1)) <= 1) return 2;
+    return 3;
+  };
+  const tiers = [[], [], [], []];
+  list.forEach(p => tiers[tier(p)].push(p));
+  return tiers.flatMap((t, i) => shuffle(t, seed + ':' + i));
+}
+const api = isDemo() ? new MockApi() : new LiveApi();
+let serverRightsLeft = null;
+function localRightsLeft() { return Math.max(0, CONFIG.DAILY_RIGHT_CAP - (S.rightsByDay[todayISO()] || 0)); }
+const rightsLeft = () => serverRightsLeft ?? localRightsLeft();
+
+/* ---------------- icons & art ---------------- */
+const IC = {
+  back: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="#1C0C04" stroke="none"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.7 3.8 4.5 7.2 4.5c2 0 3.5 1.1 4.8 2.8 1.3-1.7 2.8-2.8 4.8-2.8 3.4 0 5.6 3.2 4.4 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg>',
+  feed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="3" width="13" height="17" rx="3"/><path d="M3.5 7v11a3 3 0 003 3h9"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+  crown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>',
+  me: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4-6.5 8-6.5s7 2 8 6.5"/></svg>',
+  share: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>',
+  link: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1.2 1.2M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1.2-1.2"/></svg>',
+  wa: '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm0 18.2a8.2 8.2 0 01-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1112 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 01-3.3-2.9c-.3-.4.3-.4.8-1.3a.5.5 0 000-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 00-.7.3 3 3 0 00-.9 2.2 5.2 5.2 0 001.1 2.7 11.8 11.8 0 004.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 001.8-1.3 2.2 2.2 0 00.1-1.3c0-.1-.2-.2-.5-.3z"/></svg>',
+};
+const LOCKUP = '__LOCKUP__';
+/* toran tile, coloured for tonight: flaps alternate Picapool orange and tonight's colour, mirror work on each flap, marigold drops between */
+function toranSVG(hex) {
+  const a = hex === '#FFFFFF' ? '#E9DCCB' : hex;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">
+  <path d="M0 4h120" stroke="#F4C24D" stroke-width="3"/>
+  <path d="M2 5 Q30 52 58 5Z" fill="#FF6B22"/><path d="M62 5 Q90 52 118 5Z" fill="${a}"/>
+  <path d="M8 9 Q30 44 52 9" fill="none" stroke="#F4C24D" stroke-width="1.6" stroke-dasharray="2 3"/><path d="M68 9 Q90 44 112 9" fill="none" stroke="#F4C24D" stroke-width="1.6" stroke-dasharray="2 3"/>
+  <circle cx="30" cy="20" r="4.6" fill="#F4C24D"/><circle cx="30" cy="20" r="2.6" fill="#FFF6E0"/><circle cx="90" cy="20" r="4.6" fill="#F4C24D"/><circle cx="90" cy="20" r="2.6" fill="#FFF6E0"/>
+  <path d="M60 5v36" stroke="#F4C24D" stroke-width="1.4"/><circle cx="60" cy="48" r="9" fill="#FF9B1F"/><circle cx="60" cy="48" r="5.6" fill="#FFB938"/><circle cx="60" cy="48" r="2.4" fill="#E06A00"/>
+  <path d="M60 57 q-6 6 -2 12 q4 -6 2 -12" fill="#3E8E3A"/>
+  <path d="M0 5v36" stroke="#F4C24D" stroke-width="1.4"/><circle cx="0" cy="48" r="9" fill="#FF9B1F"/><circle cx="0" cy="48" r="5.6" fill="#FFB938"/><circle cx="0" cy="48" r="2.4" fill="#E06A00"/>
+  <path d="M120 5v36" stroke="#F4C24D" stroke-width="1.4"/><circle cx="120" cy="48" r="9" fill="#FF9B1F"/><circle cx="120" cy="48" r="5.6" fill="#FFB938"/><circle cx="120" cy="48" r="2.4" fill="#E06A00"/></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+const TORAN = '<div class="toran" aria-hidden="true"></div>';
+/* small line icons (replacing emojis in the UI) */
+const ICO = {
+  heart: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-8.7-8.9C2.2 8 4.2 5 7.3 5c1.9 0 3.4 1 4.7 2.6C13.3 6 14.8 5 16.7 5c3.1 0 5.1 3 4 6.1C19 15.6 12 20 12 20z" fill="currentColor"/></svg>',
+  crown: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 10H5z" fill="currentColor"/></svg>',
+  lock: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2.5" fill="currentColor"/><path d="M8 11V8a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>',
+  check: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+/* ---------- hero art: friends dancing garba round a lamp-lit garbo ----------
+   Original flat illustration. Dancers sway twice on arrival, then rest (and not at all with reduced motion). */
+function dancerSVG({kind, main, top, accent, skin, pagdi = null, pose = 0}) {
+  const hair = '#1E1412';
+  const arms = pose === 0 ? 'M-11 -82 L-21 -95 L-17 -114 M11 -82 L23 -91 L33 -106' : 'M-11 -82 L-24 -90 L-34 -105 M11 -82 L21 -95 L17 -114';
+  const sleeves = pose === 0 ? 'M-11 -82 L-15 -87.2 M11 -82 L15.8 -85.6' : 'M-11 -82 L-16.2 -85.2 M11 -82 L15 -87.2';
+  const sticks = pose === 0 ? 'M-17 -114 L-9 -134 M33 -106 L50 -119' : 'M-34 -105 L-51 -118 M17 -114 L9 -134';
+  const feet = '<ellipse cx="-7" cy="-2.5" rx="6" ry="3" fill="#2A1B14"/><ellipse cx="7" cy="-2.5" rx="6" ry="3" fill="#2A1B14"/>';
+  const body = kind === 'f'
+    ? `<path d="M-12 -60 C-22 -42 -33 -20 -38 -7 Q-28 -1 -19 -6 Q-10 0 0 -6 Q10 0 19 -6 Q28 -1 38 -7 C33 -20 22 -42 12 -60 Z" fill="${main}"/>
+       <path d="M-6 -58 L-15 -6 M6 -58 L15 -6" stroke="${accent}" stroke-width="3" opacity=".55"/>
+       <path d="M-38 -7 Q-28 -1 -19 -6 Q-10 0 0 -6 Q10 0 19 -6 Q28 -1 38 -7" fill="none" stroke="#F4C24D" stroke-width="3.2"/>
+       <rect x="-12.5" y="-64" width="25" height="5" rx="2" fill="#F4C24D"/>
+       <path d="M-11 -85 Q0 -89 11 -85 L12 -62 L-12 -62 Z" fill="${top}"/>
+       <path d="M10 -85 C2 -76 -6 -66 -12 -62 C-22 -50 -30 -38 -36 -28 L-30 -27 C-24 -38 -16 -50 -8 -60 C-2 -68 6 -76 14 -83 Z" fill="${accent}"/>`
+    : `<path d="M-9 -40 L-8 -5 L-2 -5 L-1 -40Z M1 -40 L2 -5 L8 -5 L9 -40Z" fill="#DCC6AA"/>
+       <path d="M-12 -85 Q0 -89 12 -85 L13 -64 C21 -56 27 -46 30 -37 Q15 -32 0 -36 Q-15 -32 -30 -37 C-27 -46 -21 -56 -13 -64 Z" fill="${main}"/>
+       <path d="M-30 -37 Q-15 -32 0 -36 Q15 -32 30 -37" fill="none" stroke="#F4C24D" stroke-width="3"/>
+       <path d="M-13 -65 L13 -65" stroke="${accent}" stroke-width="4"/>
+       <g fill="#FFF4E8"><circle cx="-6" cy="-75" r="1.6"/><circle cx="0" cy="-73" r="1.6"/><circle cx="6" cy="-75" r="1.6"/></g>`;
+  const head = `<rect x="-3" y="-94" width="6" height="10" fill="${skin}"/><circle cy="-101" r="9.5" fill="${skin}"/>` + (kind === 'f'
+    ? `<path d="M-10 -100 C-11 -113 11 -115 10 -100 C8 -106 -8 -106 -10 -100Z" fill="${hair}"/><circle cx="8" cy="-109" r="5" fill="${hair}"/><circle cx="0" cy="-103.5" r="1.3" fill="#E0343F"/>`
+    : (pagdi ? `<path d="M-11 -102 C-12 -116 12 -116 11 -102 C6 -107 -6 -107 -11 -102Z" fill="${pagdi}"/>` : `<path d="M-10 -101 C-10 -112 10 -112 10 -101 C7 -106 -7 -106 -10 -101Z" fill="${hair}"/>`));
+  return `${feet}${body}<path d="${arms}" fill="none" stroke="${skin}" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${sleeves}" stroke="${top}" stroke-width="7.5" stroke-linecap="round"/><path d="${sticks}" stroke="#F4C24D" stroke-width="4" stroke-linecap="round"/>${head}`;
+}
+function garbaArt(cls = '') {
+  const t = tonight();
+  const bulbCols = ['#FF6B22', '#F4C24D', t.hex === '#FFFFFF' ? '#E2457A' : t.hex, '#0E9A8C'];
+  const bulbs = Array.from({length: 13}, (_, i) => { const u = (i + .5) / 13, x = (1 - u) ** 2 * 8 + 2 * (1 - u) * u * 180 + u * u * 352, y = (1 - u) ** 2 * 18 + 2 * (1 - u) * u * 62 + u * u * 18;
+    return `<circle cx="${x.toFixed(1)}" cy="${(y + 5).toFixed(1)}" r="4" fill="${bulbCols[i % 4]}"/>`; }).join('');
+  const D = (x, y, sc, flip, d, o) => `<g transform="translate(${x} ${y}) scale(${flip ? -sc : sc} ${sc})"><g class="dancer" style="--d:${d}s">${dancerSVG(o)}</g></g>`;
+  const pot = `<g transform="translate(180 228)"><ellipse cy="-2" rx="22" ry="4" fill="#000" opacity=".16"/>
+    <path d="M-12 -42 C-30 -36 -32 -8 -16 -2 L16 -2 C32 -8 30 -36 12 -42 Z" fill="#C2571F"/>
+    <path d="M-26 -22 Q0 -16 26 -22" stroke="#F4C24D" stroke-width="2" fill="none" stroke-dasharray="2 3"/>
+    <g fill="#FFD66B"><circle cx="-14" cy="-31" r="2.2"/><circle cx="0" cy="-33" r="2.2"/><circle cx="14" cy="-31" r="2.2"/><circle cx="-18" cy="-12" r="2.2"/><circle cx="-6" cy="-10" r="2.2"/><circle cx="6" cy="-10" r="2.2"/><circle cx="18" cy="-12" r="2.2"/></g>
+    <rect x="-12" y="-47" width="24" height="6" rx="2" fill="#8E3A14"/><path d="M-9 -50 Q0 -44 9 -50 L7 -46 Q0 -43 -7 -46Z" fill="#D88A3A"/>
+    <path class="flame" d="M0 -78 C7 -68 8 -60 0 -51 C-8 -60 -7 -68 0 -78Z" fill="#FFC93A"/><path d="M0 -69 C3 -64 3 -59 0 -55 C-3 -59 -3 -64 0 -69Z" fill="#FFF3C4"/></g>`;
+  return `<svg class="garba-art ${cls}" viewBox="0 6 360 300" aria-hidden="true" focusable="false">
+    <path d="M8 23 Q180 67 352 23" fill="none" stroke="var(--line-2)" stroke-width="1.5"/>${bulbs}
+    <ellipse cx="180" cy="284" rx="176" ry="22" fill="var(--ground)"/>
+    ${D(118, 236, 1.02, false, .25, {kind: 'm', main: '#0E9A8C', top: '#0E9A8C', accent: '#FF6B22', skin: '#8D5A3B', pagdi: '#E0343F', pose: 1})}
+    ${D(244, 236, 1.02, false, .5, {kind: 'f', main: '#2346C8', top: '#FFC93A', accent: '#E2457A', skin: '#A86F4C', pose: 0})}
+    <g transform="translate(0 50) translate(180 228) scale(1.25) translate(-180 -228)">${pot}</g>
+    ${D(64, 296, 1.32, false, 0, {kind: 'f', main: '#FF6B22', top: '#E2457A', accent: '#F4C24D', skin: '#B98260', pose: 0})}
+    ${D(296, 296, 1.32, true, .4, {kind: 'm', main: '#E2457A', top: '#E2457A', accent: '#F4C24D', skin: '#7A4A30', pose: 0})}
+  </svg>`;
+}
+
+/* =====================================================================
+   ROUTING
+   ===================================================================== */
+const app = $('#app');
+const ONBOARD = ['phone', 'account', 'photos']; // making a card: 3 screens
+const EXTRA = ['nights', 'line']; // optional, from the Me tab
+let route = null, tab = 'feed';
+
+function frame({back = false, progress = null, right = '', body = '', actions = '', nav = false, toran = false}) {
+  return `${isDemo() ? '<div class="demo-flag">DEMO · sample profiles · nothing is saved</div>' : ''}
+  <header class="top">${back ? `<button class="back" data-back aria-label="Back">${IC.back}</button>` : ''}
+    <img class="lockup" src="${LOCKUP}" alt="Picapool"><div class="right">${right}${themeBtn()}</div></header>
+  ${toran ? TORAN : ''}
+  ${progress !== null ? `<div class="beads" role="img" aria-label="Step ${progress + 1} of ${ONBOARD.length}">${CONFIG.NIGHTS.slice(4, 4 + ONBOARD.length).map((n, i) => `<i class="${i < progress ? 'on' : i === progress ? 'now' : ''}" style="--c:${n.hex}"></i>`).join('')}</div>` : ''}
+  ${body}${actions ? `<div class="actions">${actions}</div>` : ''}${nav ? navHtml() : ''}`;
+}
+function go(name, opts = {}) {
+  route = name;
+  if (ONBOARD.includes(name)) { S.step = name; save(); }
+  (SCREENS[name] || SCREENS.landing)(opts);
+  app.querySelector('.body')?.classList.add('enter');
+  labelGroups(app);
+  const b = app.querySelector('[data-back]');
+  if (b) b.onclick = () => {
+    if (S.profile && (EXTRA.includes(name) || ONBOARD.includes(name))) { S.draft = {}; save(); tab = 'me'; return go('app'); }
+    if (name === 'nights') return go('photos');
+    const i = ONBOARD.indexOf(name);
+    if (i > 1) return go(ONBOARD[i - 1]);
+    if (name === 'preview') return go('peek');
+    if (name === 'phone' && !S.loginOnly && S.guest?.gender) return go('preview');
+    go('landing');
+  };
+}
+const prog = name => ONBOARD.indexOf(name); // one bead per step
+const D = () => S.draft;
+
+function chipGroup(key, opts, {multi = false, cls = 'chip'} = {}) {
+  const v = D()[key];
+  return `<div class="${cls === 'pill' ? 'pills' : 'chips'}" data-group="${key}" ${multi ? 'data-multi' : ''} role="group">${opts.map(([id, text, dot]) =>
+    `<button type="button" class="${cls}${dot ? ' night' : ''}" ${dot ? `style="${nightVars(dot)}"` : ''} data-v="${esc(id)}" aria-pressed="${multi ? (v || []).includes(id) : v === id}">${dot ? '<i class="dot"></i>' : ''}${esc(text)}</button>`).join('')}</div>`;
+}
+function bindChips(onChange, root = app) {
+  $$('[data-group]', root).forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('button[data-v]'); if (!b) return;
+    const key = g.dataset.group, val = b.dataset.v;
+    if (g.hasAttribute('data-multi')) {
+      const set = new Set(D()[key] || []); set.has(val) ? set.delete(val) : set.add(val); D()[key] = [...set];
+      b.setAttribute('aria-pressed', set.has(val));
+    } else {
+      D()[key] = val; $$('button', g).forEach(x => x.setAttribute('aria-pressed', x === b));
+    }
+    save(); onChange && onChange(key, val);
+  }));
+}
+const SCREENS = {};
+
+/* ---------- landing ---------- */
+SCREENS.landing = () => {
+  if (S.ageBlocked) return go('blocked');
+  if (!upcomingNights().length) return go('ended');
+  app.innerHTML = frame({
+    body: `<main class="body landing">
+      ${garbaArt()}
+      <h1 class="display">Find your<br>Dandiya partner.</h1>
+      <p class="tagline">For North Campus students only · 18+</p>
+    </main>`,
+    actions: `<button class="btn" id="start">${S.token && S.profile ? 'Open my feed' : "See who's dancing"}</button>`,
+  });
+  $('#start').onclick = () => { track('cta_start'); S.loginOnly = false; save(); go(S.token ? nextStepAfterLogin() : (S.guest?.gender ? 'preview' : 'peek')); };
+  track('landing_view');
+};
+
+/* ---------- peek: first name + gender, no account ---------- */
+const NAME_OK = /^[\p{L}][\p{L} .'-]{1,19}$/u; // same rule as the server
+SCREENS.peek = () => {
+  const g = S.guest || {gender: null, firstName: '', nights: [], likes: [], pool: [], seenIds: [], done: []};
+  const d = D(); d.gender ??= g.gender; d.firstName ??= g.firstName || '';
+  app.innerHTML = frame({back: true,
+    body: `<main class="body"><h1>Who's dancing?</h1>
+      <div class="field"><label for="pfn">First name</label><input class="input" id="pfn" autocomplete="given-name" maxlength="20" value="${esc(d.firstName)}" placeholder="First name" aria-describedby="err"></div>
+      <div class="field"><span class="lbl">Gender</span>${chipGroup('gender', [['female', 'Girl'], ['male', 'Guy']], {cls: 'pill'})}</div>
+      <div class="err" id="err" role="alert"></div></main>`,
+    actions: `<button class="btn" id="next" disabled>Show me</button><button class="link" id="login">Already made your card? Log in</button>`});
+  const next = $('#next'), fn = $('#pfn');
+  const check = () => { d.firstName = fn.value.replace(/\s+/g, ' ').trim(); save(); $('#err').textContent = ''; next.disabled = !(d.gender && d.firstName.length >= 2); };
+  fn.addEventListener('input', check); fn.onkeydown = e => { if (e.key === 'Enter' && !next.disabled) next.click(); };
+  bindChips(check); check();
+  next.onclick = () => {
+    if (!NAME_OK.test(d.firstName)) { $('#err').textContent = 'Use letters only for your first name.'; fn.focus(); return; }
+    const pool = g.gender && g.gender !== d.gender ? [] : (g.pool || []); // a different side starts a new pool, but the 5-person limit still counts everyone seen
+    S.guest = {...g, gender: d.gender, firstName: d.firstName, nights: [], pool, seenIds: g.seenIds || [], done: g.done || [], likes: g.likes || []}; save();
+    track('peek_start'); feed.queue = []; feed.peekLoaded = false; go('preview');
+  };
+  $('#login').onclick = () => { track('cta_login'); S.loginOnly = true; save(); go('phone'); };
+};
+/* ---------- preview: real cards, faces blurred, at most GUEST_PEEK_LIMIT people ever, likes kept on the phone ---------- */
+SCREENS.preview = async () => {
+  const g = S.guest; if (!g?.gender) return go('peek');
+  g.pool ||= []; g.seenIds ||= []; g.done ||= []; g.likes ||= [];
+  app.innerHTML = frame({back: true,
+    body: `<section class="feed" role="main"><h1 class="sr-only">Who's dancing</h1>
+      <div class="stack" id="stack"><div class="spinner"></div></div>
+      <div class="buttons" id="btns"><button class="round" id="nope" aria-label="Pass">${IC.x}</button><button class="round yes" id="yep" aria-label="Like">${IC.heart}</button></div></section>`,
+    actions: `<button class="btn" id="mk">Make my card</button>`});
+  $('#nope').onclick = () => flyTop('left'); $('#yep').onclick = () => flyTop('right');
+  $('#mk').onclick = () => { track('peek_to_signup', {likes: S.guest.likes.length, seen: S.guest.seenIds.length}); go('phone'); };
+  if (!feed.peekLoaded) {
+    const room = CONFIG.GUEST_PEEK_LIMIT - g.seenIds.length;
+    if (room > 0) {
+      try {
+        const r = await api.getPreview(other(g.gender), []);
+        const fresh = (r.profiles || []).filter(p => !g.seenIds.includes(p.id)).slice(0, room);
+        g.pool.push(...fresh); g.seenIds.push(...fresh.map(p => p.id)); save();
+      } catch (e) { if ($('#stack')) $('#stack').innerHTML = `<div class="feed-empty"><p class="sub">${esc(e.message)}</p></div>`; return; }
+    }
+    feed.queue = g.pool.filter(p => !g.done.includes(p.id));
+    feed.peekLoaded = true;
+  }
+  if (route === 'preview') drawStack();
+};
+const peekLimitReached = () => (S.guest?.seenIds?.length || 0) >= CONFIG.GUEST_PEEK_LIMIT;
+function peekGate(reason) {
+  const liked = !!S.guest.likes.length;
+  track('peek_gate', {reason, likes: S.guest.likes.length});
+  sheet(`<h2>${liked ? 'Your likes are waiting' : 'Want to see everyone?'}</h2>
+    <p class="sub">${liked ? "Make your card to send them and see everyone who's dancing. A like back means a match." : "Make your card to see everyone who's dancing, faces and all."}</p>
+    <button class="btn" id="gMk">Make my card</button><button class="link" id="gKeep">Not now</button>`, s => {
+      $('#gMk', s).onclick = () => { closeSheet(); go('phone'); };
+      $('#gKeep', s).onclick = closeSheet;
+    });
+}
+function flyPeek(el, p, dir) {
+  const g = S.guest;
+  flying = true;
+  el.style.transition = 'transform .3s ease-in'; el.style.transform = `translate(${dir === 'right' ? 140 : -140}%, 30px) rotate(${dir === 'right' ? 24 : -24}deg)`;
+  feed.queue.shift();
+  if (!g.done.includes(p.id)) g.done.push(p.id);
+  if (dir === 'right' && !g.likes.includes(p.id)) { g.likes.push(p.id); buzz(10); }
+  save(); track('peek_swipe', {dir});
+  setTimeout(() => { flying = false; drawStack(); }, 240);
+  if (!feed.queue.length && peekLimitReached() && !g.gated) { g.gated = true; save(); setTimeout(() => route === 'preview' && peekGate('limit'), 420); }
+}
+async function sendPendingLikes() {
+  const ids = (S.guest?.likes || []).slice(0, CONFIG.GUEST_PEEK_LIMIT);
+  if (!ids.length) return;
+  let first = null, sent = 0;
+  for (const id of ids) {
+    try { const r = await api.swipe(id, 'right'); sent++; S.swipes[id] = {dir: 'right', at: Date.now()};
+      if (r.match) { S.matches = [r.match, ...S.matches.filter(m => m.id !== r.match.id)]; first ||= r.match; track('match', {from: 'peek'}); }
+      if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday;
+    } catch (e) {}
+  }
+  S.rightsByDay[todayISO()] = (S.rightsByDay[todayISO()] || 0) + sent;
+  S.guest.likes = []; save(); track('pending_likes_sent', {sent});
+  feed.queue = feed.queue.filter(p => !ids.includes(p.id));
+  if (sent && !first) toast(sent > 1 ? 'Your likes were sent' : 'Your like was sent');
+  if (first) showMatch(first);
+}
+
+/* ---------- phone + OTP ---------- */
+SCREENS.phone = ({otp = false} = {}) => {
+  app.innerHTML = frame({back: true, progress: prog('phone'),
+    body: `<main class="body">${S.guest?.likes?.length && !S.loginOnly ? `<span class="kicker">${ICO.heart} Your likes are waiting</span>` : ''}${otp ? `<h1>Enter the code</h1><p class="sub">Sent to +91 ${esc(S.phone)} · <button class="link" id="edit" style="display:inline-block;margin:-12px -4px;padding:12px 4px;min-height:44px;vertical-align:baseline">Change</button></p>
+        <input class="input otp" id="code" aria-describedby="err" inputmode="numeric" autocomplete="one-time-code" maxlength="${CONFIG.OTP_LENGTH}" placeholder="${'•'.repeat(CONFIG.OTP_LENGTH)}" aria-label="One-time code">
+        ${isDemo() ? `<p class="hint">Demo: any ${CONFIG.OTP_LENGTH} digits work.</p>` : ''}
+        <div class="err" id="err" role="alert"></div><button class="link" id="resend" disabled>Resend in 30s</button>`
+      : `<h1>Your WhatsApp number</h1><p class="sub">We'll send you a code.</p>
+        <div class="phone-wrap"><span>+91</span><input id="ph" aria-describedby="err" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" placeholder="98765 43210" value="${esc(S.phone)}" aria-label="WhatsApp number"></div>
+        <div class="err" id="err" role="alert"></div>`}
+    </main>`,
+    actions: `<button class="btn" id="next" disabled>${otp ? 'Verify' : 'Send code'}</button>`});
+  const next = $('#next'), err = $('#err');
+  if (!otp) {
+    const ph = $('#ph');
+    ph.oninput = () => { ph.value = ph.value.replace(/\D/g, '').replace(/^(91|0)(?=\d{10})/, '').slice(0, 10); next.disabled = ph.value.length < 10; err.textContent = ''; };
+    ph.oninput();
+    ph.onkeydown = e => { if (e.key === 'Enter' && !next.disabled) next.click(); };
+    next.onclick = async () => {
+      if (!/^[6-9]\d{9}$/.test(ph.value)) { err.textContent = 'Enter your 10-digit WhatsApp number (starts with 6, 7, 8 or 9).'; return; }
+      next.disabled = true; next.textContent = 'Sending…';
+      try { S.phone = ph.value; save(); await api.sendOtp(S.phone); track('otp_sent'); go('phone', {otp: true}); }
+      catch (e) { err.textContent = e.message; next.disabled = false; next.textContent = 'Send code'; }
+    };
+  } else {
+    const code = $('#code'); setTimeout(() => code.focus({preventScroll: true}), 250);
+    $('#edit').onclick = () => go('phone');
+    let s = 30; const rs = $('#resend');
+    const iv = setInterval(() => { if (!document.body.contains(rs)) return clearInterval(iv); s--;
+      if (s <= 0) { clearInterval(iv); rs.disabled = false; rs.textContent = 'Resend code'; } else rs.textContent = `Resend in ${s}s`; }, 1000);
+    rs.onclick = async () => { rs.disabled = true; try { await api.sendOtp(S.phone); toast('Code sent again'); go('phone', {otp: true}); } catch (e) { err.textContent = e.message; rs.disabled = false; } };
+    let busy = false;
+    const verify = async () => {
+      if (busy) return; busy = true;
+      next.disabled = true; next.textContent = 'Checking…';
+      try {
+        const r = await api.verifyOtp(S.phone, code.value);
+        S.token = r.token; S.user = r.user || null; S.profile = r.profile || null; S.picapool = null; save();
+        track('otp_verified', {existing: !!r.user});
+        const nx = nextStepAfterLogin(); go(nx);
+        if (nx === 'app') sendPendingLikes();
+      } catch (e) { err.textContent = e.message; next.disabled = false; next.textContent = 'Verify'; code.select(); busy = false; }
+    };
+    code.oninput = () => { code.value = code.value.replace(/\D/g, '').slice(0, CONFIG.OTP_LENGTH); next.disabled = code.value.length < CONFIG.OTP_LENGTH; err.textContent = '';
+      if (code.value.length === CONFIG.OTP_LENGTH) verify(); };
+    next.onclick = verify;
+  }
+};
+function nextStepAfterLogin() {
+  if (!S.token) return 'phone';
+  if (S.profile && S.profile.photos?.length) return 'app';
+  if (!S.picapool) return 'lookup';
+  if (!S.user || !S.user.firstName || !S.user.gender || !S.user.adult) return 'account';
+  return S.step && ONBOARD.indexOf(S.step) > 1 ? S.step : 'photos';
+}
+/* ---------- after OTP: is there a Picapool account on this number? ----------
+   The answer never blocks anything: with or without Picapool, people make their Stick Together profile here. */
+SCREENS.lookup = async () => {
+  app.innerHTML = frame({body: `<main class="body"><div class="lookup" role="status" aria-live="polite" id="lk">
+      <div class="spinner" aria-hidden="true"></div><h1>Checking for a Picapool account</h1><p class="sub">On +91 ${esc(S.phone)}. One moment.</p></div></main>`});
+  const t0 = Date.now();
+  let r; try { r = await api.lookupPicapool(); } catch (e) { r = {status: 'unavailable'}; }
+  await sleep(Math.max(0, 700 - (Date.now() - t0))); // long enough to read, short enough not to annoy
+  if (route !== 'lookup') return;
+  const status = ['found', 'not_found'].includes(r.status) ? r.status : 'unavailable';
+  S.picapool = status;
+  if (status === 'found' && r.user) S.user = {...(S.user || {}), ...r.user, adult: !!S.user?.adult};
+  save(); track('picapool_lookup', {status});
+  const copy = {
+    found: ['Found your Picapool account', "We've filled in what we could. Check it and carry on."],
+    not_found: ["You don't have a Picapool account yet", "Looks like you don't have a Picapool account. No worries, create a profile here for now."],
+    unavailable: ["Couldn't check Picapool right now", "No problem. You can make your profile here without a Picapool account."],
+  }[status];
+  app.innerHTML = frame({body: `<main class="body"><div class="lookup" role="status" aria-live="polite" id="lk"><h1>${copy[0]}</h1><p class="sub">${copy[1]}</p>
+      ${isDemo() ? '<p class="hint">Demo: we never connect to Picapool here.</p>' : ''}</div></main>`,
+    actions: `<button class="btn" id="next">Continue</button>`});
+  $('#next').onclick = () => go(nextStepAfterLogin());
+  $('#next').focus({preventScroll: true});
+};
+/* ---------- account: first name, gender, then date of birth → college → nights ----------
+   Date of birth lives only in this variable: never saved on the phone, never sent. Only "adult: true" goes to the server. */
+let dobMem = ''; // "DD/MM/YYYY" while typing; never saved, never sent
+SCREENS.account = () => {
+  const u = S.user || {}; const d = D();
+  d.firstName ??= u.firstName || S.guest?.firstName || ''; d.gender ??= u.gender || S.guest?.gender || null;
+  // linked to Picapool: its first name and gender win over what was typed on "Who's dancing?" (HANDOFF §4b)
+  const linked = !!u.hasPicapool;
+  if (linked && u.firstName) d.firstName = u.firstName;
+  if (linked && u.gender && u.gender !== d.gender) { d.gender = u.gender; if (S.guest) { S.guest.likes = []; } } // likes picked for the other side no longer apply
+  // asked on "Who's dancing?"; only asked here if someone came straight to Log in without peeking
+  const askName = !NAME_OK.test(d.firstName || ''), askGender = !d.gender;
+  if (d.college === undefined) {
+    const known = u.college || '';
+    d.college = known && !collegesFor(d.gender || 'female').includes(known) ? OTHER_COLLEGE : known;
+    d.collegeOther = d.college === OTHER_COLLEGE ? known : '';
+  }
+  d.nights ??= [];
+  d.nights = d.nights.filter(id => upcomingNights().some(n => n.id === id));
+  const opt = (v, t, sel) => `<option value="${esc(v)}" ${String(sel) === String(v) ? 'selected' : ''}>${esc(t)}</option>`;
+  const collegeOptions = () => `<option value="">${d.gender ? 'Pick your college' : 'Pick your gender first'}</option>${d.gender ? collegesFor(d.gender).map(c => opt(c, c, d.college)).join('') + opt(OTHER_COLLEGE, 'Other college', d.college) : ''}`;
+  app.innerHTML = frame({back: true, progress: prog('account'),
+    body: `<main class="body"><h1>About you</h1>
+      ${linked && u.firstName ? `<p class="hint" style="margin:-2px 0 4px">From your Picapool account: ${esc(u.firstName)}${u.gender ? ` · ${u.gender === 'female' ? 'Girl' : 'Guy'}` : ''}</p>` : ''}
+      ${askName ? `<div class="field"><label for="fn">First name</label><input class="input" id="fn" autocomplete="given-name" maxlength="20" value="${esc(d.firstName)}" placeholder="First name"></div>` : ''}
+      ${askGender ? `<div class="field"><span class="lbl">Gender</span>${chipGroup('gender', [['female', 'Girl'], ['male', 'Guy']], {cls: 'pill'})}</div>` : ''}
+      <div class="field"><label for="dob">Date of birth</label>
+        <input class="input" id="dob" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="DD/MM/YYYY" value="${esc(dobMem)}" aria-describedby="dobHint err">
+        <p class="hint" id="dobHint">DD/MM/YYYY. Only to check you're 18+. Never shown or stored.</p></div>
+      <div class="field"><label for="col">College</label><select class="input" id="col" ${d.gender ? '' : 'disabled'}>${collegeOptions()}</select>
+        <input class="input" id="colOther" maxlength="60" placeholder="Type your college" aria-label="Your college" style="margin-top:10px" value="${esc(d.collegeOther || '')}" ${d.college === OTHER_COLLEGE ? '' : 'hidden'}></div>
+      <div class="field"><span class="lbl">Which nights are you going?</span>${chipGroup('nights', upcomingNights().map(n => [n.id, fmtDate(n), n.hex]), {multi: true})}</div>
+      <label class="check"><input type="checkbox" id="ok" ${d.consent ? 'checked' : ''}><span>I'm 18+ and agree to Picapool showing my card here. Photos only to signed-in people. Deleted on ${+CONFIG.DELETE_ON.slice(8)} Oct.</span></label>
+      <div class="err" id="err" role="alert"></div>
+    </main>`,
+    actions: `<button class="btn" id="next" disabled>Continue</button>`});
+  const fn = $('#fn') || {value: d.firstName, addEventListener() {}}, col = $('#col'), colOther = $('#colOther'), dob = $('#dob'), ok = $('#ok'), next = $('#next');
+  /* type digits, slashes appear by themselves: 14032004 → 14/03/2004 */
+  const fmtDob = v => { const x = v.replace(/\D/g, '').slice(0, 8); return [x.slice(0, 2), x.slice(2, 4), x.slice(4)].filter(Boolean).join('/'); };
+  dob.addEventListener('input', () => { const atEnd = dob.selectionStart === dob.value.length; dob.value = fmtDob(dob.value); if (atEnd) dob.setSelectionRange(dob.value.length, dob.value.length); });
+  const collegeValue = () => d.college === OTHER_COLLEGE ? (d.collegeOther || '').replace(/\s+/g, ' ').trim() : d.college;
+  const check = key => {
+    if (key === 'gender') { // guys never see women-only colleges
+      if (d.college && d.college !== OTHER_COLLEGE && !collegesFor(d.gender).includes(d.college)) d.college = '';
+      col.innerHTML = collegeOptions(); col.disabled = !d.gender; col.value = d.college || '';
+    }
+    d.firstName = fn.value.replace(/\s+/g, ' ').trim(); d.college = col.value; d.collegeOther = colOther.value; d.consent = ok.checked;
+    colOther.hidden = d.college !== OTHER_COLLEGE;
+    dobMem = dob.value; $('#err').textContent = ''; save();
+    next.disabled = !(d.firstName.length >= 2 && d.gender && /^\d\d\/\d\d\/\d{4}$/.test(dobMem) && collegeValue().length >= 2 && d.nights.length && d.consent);
+  };
+  [fn, col, colOther, dob].forEach(el => { el.addEventListener('input', () => check()); el.addEventListener('change', () => check()); }); ok.onchange = () => check();
+  col.addEventListener('change', () => { if (col.value === OTHER_COLLEGE) colOther.focus(); });
+  bindChips(check); check();
+  next.onclick = async () => {
+    const [Dd, M, Y] = dobMem.split('/').map(Number), dt = new Date(Y, M - 1, Dd);
+    const [ty, tm, td] = todayISO().split('-').map(Number);
+    if (!(M >= 1 && M <= 12) || dt.getFullYear() !== Y || dt.getMonth() !== M - 1 || dt.getDate() !== Dd || Y < ty - 100 || Y > ty) {
+      $('#err').textContent = M >= 1 && M <= 12 && Dd > 28 && dt.getMonth() !== M - 1 ? `${MONTHS[M - 1]} doesn't have ${Dd} days. Check your date of birth.` : 'That date doesn\'t look right. Type it as DD/MM/YYYY, like 14/03/2004.';
+      dob.focus(); return;
+    }
+    const age = ty - Y - ((tm < M || (tm === M && td < Dd)) ? 1 : 0);
+    dobMem = '';
+    if (age < 18) {
+      S.ageBlocked = true; save(); track('age_blocked');
+      try { await api.recordAgeBlock(); } catch (e) {}
+      return go('blocked');
+    }
+    next.disabled = true; next.textContent = 'Saving…';
+    try {
+      const r = await api.saveAccount({firstName: d.firstName, gender: d.gender, college: collegeValue(), adult: true});
+      S.user = {...r.user, adult: true}; delete d.collegeOther; save(); track('account_created');
+      go('photos');
+    } catch (e) { $('#err').textContent = e.message; next.disabled = false; next.textContent = 'Continue'; }
+  };
+};
+SCREENS.blocked = () => {
+  app.innerHTML = frame({body: `<main class="body center">${garbaArt('sm')}<h1 class="display">${CONFIG.PRODUCT} is 18+ only</h1>
+    <p class="sub">Enjoy the garba anyway! Picapool still works for you: group buys, shared rides and quick asks around campus.</p></main>`,
+    actions: `<a class="btn" href="${CONFIG.PLAY_STORE}" target="_blank" rel="noopener">Get the Picapool app</a>`});
+};
+SCREENS.ended = () => {
+  app.innerHTML = frame({body: `<main class="body center">${garbaArt('sm')}<h1 class="display">That's a wrap for Navratri</h1>
+    <p class="sub">Thanks for dancing with us. Dandiya profiles have been cleared. Picapool keeps going: group buys, rides and asks around North Campus.</p></main>`,
+    actions: `<a class="btn" href="${CONFIG.PLAY_STORE}" target="_blank" rel="noopener">Open Picapool</a>`});
+};
+
+/* ---------- photos: up to 5, pick several at once, the first one is the main photo ---------- */
+SCREENS.photos = () => {
+  const d = D(); d.photos ??= S.profile?.photos ? [...S.profile.photos] : [];
+  const max = CONFIG.MAX_PHOTOS, n = d.photos.length;
+  const slots = Array.from({length: max}, (_, i) => d.photos[i]
+    ? `<div class="slot filled" role="group" aria-label="Photo ${i + 1}${i === 0 ? ', main photo' : ''}" style="background-image:url('${esc(d.photos[i])}')">
+        <button class="x" data-rm="${i}" aria-label="Remove photo ${i + 1}">×</button>
+        ${i === 0 ? '<span class="main">Main photo</span>' : `<button class="mk" data-main="${i}" aria-label="Make photo ${i + 1} the main photo">Make main</button>`}</div>`
+    : `<label class="slot${i === n && !n ? ' add-first' : ''}" for="file" aria-label="Add photos">+</label>`).join('');
+  app.innerHTML = frame({back: true, progress: prog('photos'),
+    body: `<main class="body"><h1>Add your photos</h1>
+      <p class="sub">Your face, clearly. Up to ${max}. Pick several at once if you like.</p>
+      <div class="photos">${slots}</div><input type="file" id="file" class="file-input" accept="image/*" multiple aria-label="Add photos">
+      ${n > 1 ? '<p class="photo-note">The main photo is the one people see first. Tap "Make main" to change it.</p>' : ''}
+      <div class="err" id="err" role="alert"></div></main>`,
+    actions: `<button class="btn" id="next" ${n ? '' : 'disabled'}>${S.profile ? 'Save photos' : (D().nights?.length ? 'Make my card' : 'Continue')}</button>${isDemo() && !n ? '<button class="link" id="skip">Skip for now (demo only)</button>' : ''}`});
+  const file = $('#file'), err = $('#err');
+  $$('[data-rm]').forEach(b => b.onclick = e => { e.preventDefault(); d.photos.splice(+b.dataset.rm, 1); save(); go('photos'); });
+  $$('[data-main]').forEach(b => b.onclick = () => { const i = +b.dataset.main; d.photos.unshift(...d.photos.splice(i, 1)); save(); go('photos'); toast('Main photo changed'); $('.slot .main')?.parentElement.focus?.(); });
+  file.onchange = async () => {
+    const files = [...(file.files || [])]; file.value = '';
+    if (!files.length) return;
+    const room = max - d.photos.length;
+    if (room <= 0) { err.textContent = `You already have ${max} photos. Remove one to add another.`; return; }
+    const take = files.slice(0, room);
+    err.style.color = 'var(--muted)'; err.textContent = take.length > 1 ? `Adding ${take.length} photos…` : 'Adding photo…';
+    let failed = 0;
+    for (const f of take) { try { d.photos.push(await cropImage(f, 720, 900)); } catch (e) { failed++; } }
+    save(); go('photos');
+    const note = [failed ? `${failed} photo${failed > 1 ? 's' : ''} couldn't be read. Try JPG or PNG.` : '', files.length > room ? `Only ${max} photos fit, so we added the first ${room}.` : ''].filter(Boolean).join(' ');
+    if (note) { const e2 = $('#err'); if (e2) e2.textContent = note; }
+  };
+  const after = () => { if (S.profile) return saveProfileFromDraft(S.profile.inBoard, $('#next')); d.nights ??= []; save(); d.nights.length ? saveProfileFromDraft(true, $('#next')) : go('nights'); };
+  $('#next').onclick = () => { track('photos_done', {count: d.photos.length}); after(); };
+  $('#skip') && ($('#skip').onclick = () => { d.photos = [sampleAvatar('#FF8A4C', '#2346C8', S.phone || 'me')]; save(); after(); });
+};
+/* 18×22 colour thumbnail of the main photo: all a guest ever receives (shown heavily blurred) */
+async function makeThumb(src) {
+  try { const img = await loadImg(src); const c = document.createElement('canvas'); c.width = 18; c.height = 22; cover(c.getContext('2d'), img, 0, 0, 18, 22); return c.toDataURL('image/jpeg', .6); }
+  catch (e) { return null; }
+}
+function cropImage(file, W, H) {
+  return new Promise((res, rej) => {
+    if (file.size > 25e6) return rej(new Error('That photo is too big. Pick one under 25 MB.'));
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const ratio = W / H, ir = img.naturalWidth / img.naturalHeight;
+        let sw = img.naturalWidth, sh = img.naturalHeight, sx = 0, sy = 0;
+        if (ir > ratio) { sw = sh * ratio; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / ratio; sy = (img.naturalHeight - sh) / 2.6; }
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+        URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.8));
+      } catch (e) { URL.revokeObjectURL(url); rej(new Error("Couldn't read that photo. Try a JPG or PNG.")); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("Couldn't read that photo. Try a JPG or PNG (HEIC isn't supported on every phone).")); };
+    img.src = url;
+  });
+}
+
+/* ---------- nights + venue ---------- */
+SCREENS.nights = () => {
+  const d = D(); d.nights ??= S.profile?.nights ? [...S.profile.nights] : []; d.venue ??= S.profile?.venue || null;
+  d.nights = d.nights.filter(id => upcomingNights().some(n => n.id === id));
+  const venueOther = !!d.venue && !CONFIG.VENUES.includes(d.venue);
+  app.innerHTML = frame({back: true,
+    body: `<main class="body"><h1>${S.profile ? 'Your nights and where' : 'Which nights are you going?'}</h1>
+
+      ${chipGroup('nights', upcomingNights().map(n => [n.id, `${fmtDate(n)} · ${n.colour}`, n.hex]), {multi: true})}
+      <div class="q">Where? <span class="small">(optional)</span></div>
+      ${chipGroup('venue', [...CONFIG.VENUES.map(v => [v, v]), ['__other', 'Other']])}
+      <input class="input" id="vo" placeholder="Type the event or place" maxlength="40" style="margin-top:10px" ${venueOther ? '' : 'hidden'} value="${venueOther && d.venue !== '__other' ? esc(d.venue) : ''}" aria-label="Event or place">
+    </main>`,
+    actions: `<button class="btn" id="next">${S.profile ? 'Save' : 'Make my card'}</button>`});
+  const vo = $('#vo'), next = $('#next');
+  if (venueOther) $(`[data-group=venue] [data-v="__other"]`).setAttribute('aria-pressed', 'true');
+  const check = (key, val) => {
+    if (key === 'venue') { vo.hidden = val !== '__other'; if (val === '__other') { d.venue = vo.value.trim() || '__other'; vo.focus(); } }
+    next.disabled = !(d.nights.length && d.venue !== '__other');
+  };
+  vo.oninput = () => { d.venue = vo.value.replace(/\s+/g, ' ').trim() || '__other'; save(); check(); };
+  bindChips(check); check();
+  next.onclick = () => saveProfileFromDraft(S.profile ? S.profile.inBoard : true, next);
+};
+
+/* ---------- your line (Hinge-style prompt) ---------- */
+SCREENS.line = () => {
+  const d = D();
+  if (d.promptId === undefined) { d.promptId = S.profile?.prompt?.id || 'anthem'; d.promptText = S.profile?.prompt?.text || ''; }
+  app.innerHTML = frame({back: true,
+    body: `<main class="body"><h1>Your line</h1>
+      <p class="sub">Something your match can reply to.</p>
+      ${chipGroup('promptId', OPTIONS.prompt)}
+      <div class="field"><label for="pt" id="ptl">${esc(label('prompt', d.promptId))}…</label>
+        <textarea class="input" id="pt" maxlength="60" rows="2" placeholder="Keep it short and fun">${esc(d.promptText)}</textarea>
+        <div class="count" id="cnt">0/60</div></div>
+    </main>`,
+    actions: `<button class="btn" id="next">Save</button>${S.profile?.prompt ? '<button class="link" id="skip">Remove my line</button>' : ''}`});
+  const pt = $('#pt'), cnt = $('#cnt'), next = $('#next');
+  const upd = () => { d.promptText = pt.value.replace(/\s+/g, ' ').slice(0, 60); cnt.textContent = `${pt.value.length}/60`; next.disabled = d.promptText.trim().length < 2; save(); };
+  pt.oninput = upd; upd();
+  bindChips((k, v) => { $('#ptl').textContent = label('prompt', v) + '…'; pt.focus(); });
+  next.onclick = () => saveProfileFromDraft(S.profile.inBoard, next);
+  $('#skip') && ($('#skip').onclick = () => { d.promptText = ''; save(); saveProfileFromDraft(S.profile.inBoard, $('#skip')); });
+};
+
+async function saveProfileFromDraft(inBoard, btn) {
+  const d = D(), old = S.profile || {};
+  const text = (d.promptText || '').trim();
+  const prompt = d.promptId !== undefined ? (text.length >= 2 ? {id: d.promptId, text} : null) : (old.prompt || null);
+  const nights = d.nights?.length ? d.nights : (old.nights || []);
+  const p = {photos: (d.photos || old.photos).slice(0, CONFIG.MAX_PHOTOS), nights, venue: d.venue ?? old.venue ?? null, prompt, inBoard: !!inBoard};
+  $$('.actions button', app).forEach(b => b.disabled = true);
+  const label0 = btn ? btn.textContent : ''; if (btn) btn.textContent = 'Saving…';
+  try {
+    p.thumb = (old.photos && old.photos[0] === p.photos[0] && old.thumb) ? old.thumb : await makeThumb(p.photos[0]);
+    const r = await api.saveProfile(p);
+    const editing = !!S.profile;
+    S.profile = r.profile || p; S.draft = {}; S.step = null; save();
+    track(editing ? 'profile_edited' : 'profile_done', {nights: p.nights.length, fromPeek: !!S.guest?.gender});
+    feed.queue = []; feed.peekLoaded = false; tab = editing ? 'me' : 'feed'; go('app');
+    if (editing) toast('Saved');
+    else await sendPendingLikes();
+  } catch (e) {
+    $$('.actions button', app).forEach(b => b.disabled = false); if (btn) btn.textContent = label0;
+    const er = $('#err'); er ? er.textContent = e.message : toast(e.message);
+  }
+}
+
+/* =====================================================================
+   MAIN APP: feed · matches · leaderboard · me
+   ===================================================================== */
+function navHtml() {
+  const unseen = S.matches.filter(m => !S.seenMatchIds.includes(m.id)).length;
+  const items = [['feed', 'Swipe', IC.feed], ['matches', 'Matches', IC.chat], ['board', 'Board', IC.crown], ['me', 'Me', IC.me]];
+  const crowned = hasCrown();
+  return `<nav class="nav">${items.map(([id, t, ic]) => `<button data-tab="${id}" ${tab === id ? 'aria-current="page"' : ''}>${ic}${t}${id === 'matches' && unseen ? `<span class="badge">${unseen}</span>` : ''}${id === 'board' && crowned ? '<span class="cdot" aria-label="You have a crown"></span>' : ''}</button>`).join('')}</nav>`;
+}
+function bindNav() { $$('.nav [data-tab]', app).forEach(b => b.onclick = () => { tab = b.dataset.tab; go('app'); }); }
+function refreshNav() { const n = $('.nav', app); if (!n) return; n.outerHTML = navHtml(); bindNav(); }
+/* ---------- crowns: notice when someone is in tonight's top 20 ---------- */
+const myBoardKey = () => S.user?.gender === 'female' ? 'queen' : 'king';
+const hasCrown = () => !!(S.crown && S.crown.day === todayISO() && S.profile?.inBoard);
+let crownCheckedAt = 0;
+async function checkCrown(force) {
+  if (!S.user || !S.profile) return;
+  if (!S.profile.inBoard) return setCrown(null);
+  if (!force && Date.now() - crownCheckedAt < 60e3) return;
+  crownCheckedAt = Date.now();
+  try { const r = await api.getLeaderboard(myBoardKey(), 'tonight'); setCrown(r.me && r.me.rank ? {rank: r.me.rank, day: todayISO()} : null); } catch (e) {}
+}
+function setCrown(c) {
+  const before = JSON.stringify(S.crown || null); S.crown = c; save();
+  if (before === JSON.stringify(c)) return;
+  if (c && (!before || before === 'null')) track('crown_earned', {rank: c.rank});
+  refreshNav(); renderCrownBar();
+  if (route === 'app' && tab === 'me') renderMe();
+}
+function renderCrownBar() {
+  const el = $('#crownBar'); if (!el) return;
+  const c = S.crown;
+  if (!hasCrown() || S.crownHidden === todayISO() + ':' + c.rank) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="crownbar" role="status"><span>${ICO.crown} #${c.rank} ${esc(boardFor(S.user.gender))} tonight</span><button class="go" id="cbGo">Flaunt it</button><button class="x" id="cbX" aria-label="Hide for today">×</button></div>`;
+  $('#cbGo').onclick = () => openShare('rank', c.rank, 'tonight');
+  $('#cbX').onclick = () => { S.crownHidden = todayISO() + ':' + c.rank; save(); el.innerHTML = ''; };
+}
+let pollTimer = null;
+function startPolling() {
+  if (isDemo() || pollTimer) return;
+  pollTimer = setInterval(async () => {
+    if (document.hidden || route !== 'app' || !S.token) return;
+    try { await syncMatches(); } catch (e) {}
+    checkCrown();
+  }, CONFIG.POLL_MS);
+}
+async function syncMatches() {
+  const r = await api.getMatches();
+  const before = new Set(S.matches.map(m => m.id));
+  S.matches = r.matches || []; save();
+  const fresh = S.matches.filter(m => !before.has(m.id));
+  if (fresh.length && tab !== 'matches') { buzz([20, 40, 20]); toast(`New match: ${fresh[0].person.name}`); }
+  if (route === 'app' && tab === 'matches' && !$('.sheet-bg', app)) renderMatches(); else refreshNav();
+}
+SCREENS.app = () => {
+  if (!S.token || !S.user) return go('landing');
+  if (!S.profile) return go(nextStepAfterLogin());
+  ({feed: renderFeed, matches: renderMatches, board: renderBoard, me: renderMe})[tab]();
+  bindNav(); startPolling(); checkCrown();
+  if (tab === 'matches' && !isDemo()) syncMatches().catch(() => {});
+};
+
+/* ---------- cards ---------- */
+function cardHtml(p, {preview = false, peek = false} = {}) {
+  const nights = (p.nights || []).map(nightById).filter(Boolean);
+  const mine = peek ? (S.guest?.nights || []) : (S.profile?.nights || []);
+  const shared = !preview ? nights.filter(n => mine.includes(n.id) && n.date >= todayISO()) : [];
+  const photos = peek ? [] : (p.photos || []);
+  const n1 = nights[0] || tonight(), n2 = nights[nights.length - 1] || tonight();
+  const bg = peek ? (p.thumb ? `background-image:url('${esc(p.thumb)}')` : `background:linear-gradient(160deg,${n1.hex},${n2.hex})`) : `background-image:url('${esc(photos[0] || '')}')`;
+  return `<div class="card" data-id="${esc(p.id)}" data-photo="0">
+    <div class="photo${peek ? ' blur' : ''}" style="${bg}"></div>
+    ${photos.length > 1 ? `<div class="bars">${photos.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+    ${!preview && shared.length ? `<div class="kb glass">Both going ${shared.map(n => n.day).join(', ')}</div>` : ''}
+    ${peek ? `<span class="lockpill glass">${ICO.lock} Join to see</span>` : ''}
+    ${preview || peek ? '' : `<button class="more glass" aria-label="Report or block ${esc(p.name)}">⋯</button>${p.sample ? '<span class="sample">SAMPLE</span>' : ''}`}
+    ${preview ? '' : '<div class="stamp yes" aria-hidden="true">DANCE?</div><div class="stamp no" aria-hidden="true">PASS</div>'}
+    <div class="info">
+      ${p.prompt && !preview ? `<div class="pr"><small>${esc(label('prompt', p.prompt.id))}…</small>${esc(p.prompt.text)}</div>` : ''}
+      <div class="name">${esc(p.name || p.firstName)}</div><div class="college">${esc(p.college)}</div>
+      <div class="row">${nights.map(n => `<span class="nd"><i style="background:${n.hex}"></i>${n.day}</span>`).join('')}
+        ${!preview && p.venue ? `<span class="t">${esc(p.venue)}</span>` : ''}</div>
+    </div></div>`;
+}
+
+/* ---------- feed ---------- */
+let feed = {queue: [], allNights: false, peekLoaded: false, mode: 'new'}; // mode: 'new' | 'passed'
+async function renderFeed() {
+  const reviewing = feed.mode === 'passed';
+  app.innerHTML = frame({nav: true,
+    body: `<section class="feed" role="main"><h1 class="sr-only">${reviewing ? 'Profiles you passed' : 'People going your nights'}</h1><div id="crownBar"></div>
+      ${reviewing ? `<div class="review-bar"><span>Profiles you passed</span><button class="link" id="doneRev">Done</button></div>`
+        : `<div class="filters"><button class="chip" data-f="mine" aria-pressed="${!feed.allNights}">My nights</button>
+        <button class="chip" data-f="all" aria-pressed="${feed.allNights}">All nights</button></div>`}
+      <div class="stack" id="stack"><div class="spinner"></div></div>
+      <div class="buttons" id="btns"><button class="round" id="nope" aria-label="Pass">${IC.x}</button><button class="round yes" id="yep" aria-label="Like">${IC.heart}</button></div>
+    </section>`});
+  bindNav(); renderCrownBar();
+  $$('[data-f]').forEach(b => b.onclick = () => { const all = b.dataset.f === 'all'; if (all === feed.allNights) return; feed.allNights = all; feed.queue = []; renderFeed(); });
+  $('#doneRev') && ($('#doneRev').onclick = endReview);
+  $('#nope').onclick = () => flyTop('left'); $('#yep').onclick = () => flyTop('right');
+  if (!feed.queue.length) {
+    try { const r = await api.getFeed({allNights: feed.allNights, passed: reviewing}); feed.queue = (r.profiles || []).filter(p => !S.blocked.includes(p.id)); if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday; }
+    catch (e) { if ($('#stack')) $('#stack').innerHTML = `<div class="feed-empty"><p class="sub">${esc(e.message)}</p><button class="btn ghost" id="retry">Try again</button></div>`; $('#retry') && ($('#retry').onclick = renderFeed); return; }
+  }
+  if (route === 'app' && tab === 'feed') drawStack();
+}
+function startReview() { feed.mode = 'passed'; feed.queue = []; track('review_passed'); renderFeed(); }
+function endReview() { feed.mode = 'new'; feed.queue = []; renderFeed(); }
+function drawStack() {
+  const st = $('#stack'); if (!st) return;
+  const q = feed.queue;
+  const peek = route === 'preview';
+  if (!q.length && peek) {
+    $('#btns').style.visibility = 'hidden';
+    st.innerHTML = peekLimitReached()
+      ? `<div class="feed-empty"><h2 style="margin:0">Make your card to see more</h2><p class="sub" style="margin:0">Guests can peek at ${CONFIG.GUEST_PEEK_LIMIT} people. Your card shows you everyone who's dancing.</p></div>`
+      : `<div class="feed-empty"><h2 style="margin:0">That's everyone for now</h2><p class="sub" style="margin:0">Make your card and we'll show you people as they join.</p></div>`;
+    return;
+  }
+  if (!q.length) {
+    $('#btns').style.visibility = 'hidden';
+    if (feed.mode === 'passed') {
+      st.innerHTML = `<div class="feed-empty"><h2 style="margin:0">That's everyone you passed</h2><button class="btn ghost" id="doneRev2">Back to new people</button></div>`;
+      $('#doneRev2').onclick = endReview; return;
+    }
+    st.innerHTML = `<div class="feed-empty"><h2 style="margin:0">You've seen everyone for now</h2>
+      <p class="sub" style="margin:0">More people join every hour.</p>
+      <button class="btn" id="shareMine">${IC.link} Share invite link</button>
+      ${feed.allNights ? '' : '<button class="btn ghost" id="allN">Show all nights</button>'}
+      <button class="link" id="revPass">Review passed profiles</button></div>`;
+    $('#allN') && ($('#allN').onclick = () => { feed.allNights = true; feed.queue = []; renderFeed(); });
+    $('#shareMine').onclick = () => openShare('partner');
+    $('#revPass').onclick = startReview;
+    return;
+  }
+  $('#btns').style.visibility = '';
+  st.innerHTML = `<div class="deck">${(q[1] ? cardHtml(q[1], {peek}).replace('class="card"', 'class="card under" aria-hidden="true" inert') : '') + cardHtml(q[0], {peek})}</div>`;
+  bindCard($('.deck', st).lastElementChild, q[0]);
+}
+function bindCard(el, p) {
+  let sx = 0, sy = 0, dx = 0, dy = 0, dragging = false, moved = false, downT = null;
+  const yes = $('.stamp.yes', el), no = $('.stamp.no', el);
+  el.addEventListener('pointerdown', e => { if (e.target.closest('.more')) return; dragging = true; moved = false; downT = e.target; sx = e.clientX; sy = e.clientY; dx = dy = 0;
+    try { el.setPointerCapture(e.pointerId); } catch (_) {} el.style.transition = 'none'; });
+  el.addEventListener('pointermove', e => { if (!dragging) return; dx = e.clientX - sx; dy = e.clientY - sy; if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
+    el.style.transform = `translate(${dx}px,${dy * .25}px) rotate(${dx / 18}deg)`; yes.style.opacity = Math.max(0, dx / 90); no.style.opacity = Math.max(0, -dx / 90); });
+  const end = e => { if (!dragging) return; dragging = false; el.style.transition = 'transform .25s';
+    if (Math.abs(dx) > Math.min(110, el.offsetWidth * 0.28)) return (route === 'preview' ? flyPeek : fly)(el, p, dx > 0 ? 'right' : 'left');
+    el.style.transform = ''; yes.style.opacity = no.style.opacity = 0;
+    if (!moved && e.type === 'pointerup') tapCard(el, p, e, downT); };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  const mb = $('.more', el); if (mb) mb.onclick = e => { e.stopPropagation(); openReport(p); };
+}
+function tapCard(el, p, e, t) {
+  if (t && t.closest('.info')) return el.classList.toggle('open');
+  if ((p.photos || []).length < 2) return;
+  const r = el.getBoundingClientRect(); let i = +el.dataset.photo; i = e.clientX - r.left > r.width / 2 ? Math.min(i + 1, p.photos.length - 1) : Math.max(i - 1, 0);
+  el.dataset.photo = i; $('.photo', el).style.backgroundImage = `url('${p.photos[i]}')`; $$('.bars i', el).forEach((b, j) => b.classList.toggle('on', j <= i));
+}
+let flying = false;
+function flyTop(dir) { if (flying) return; const el = $('#stack .card:not(.under)'); if (el && feed.queue[0]) (route === 'preview' ? flyPeek : fly)(el, feed.queue[0], dir); }
+async function fly(el, p, dir) {
+  if (dir === 'right' && rightsLeft() <= 0) { el.style.transform = ''; $$('.stamp', el).forEach(s => s.style.opacity = 0); return toast(`That's today's ${CONFIG.DAILY_RIGHT_CAP} right swipes. Back tomorrow!`); }
+  flying = true;
+  el.style.transition = 'transform .3s ease-in'; el.style.transform = `translate(${dir === 'right' ? 140 : -140}%, 30px) rotate(${dir === 'right' ? 24 : -24}deg)`;
+  feed.queue.shift();
+  const prev = S.swipes[p.id];
+  S.swipes[p.id] = {dir, at: Date.now(), retried: !!prev};
+  if (dir === 'right') { S.rightsByDay[todayISO()] = (S.rightsByDay[todayISO()] || 0) + 1; if (serverRightsLeft !== null) serverRightsLeft = Math.max(0, serverRightsLeft - 1); buzz(10); }
+  S.feedSwipes = (S.feedSwipes || 0) + 1;
+  save(); track('swipe', {dir, review: feed.mode === 'passed'});
+  setTimeout(() => { flying = false; drawStack(); }, 240);
+  maybeLinePrompt();
+  try {
+    const r = await api.swipe(p.id, dir);
+    if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday;
+    if (r.match) { S.matches = [r.match, ...S.matches.filter(m => m.id !== r.match.id)]; save(); track('match', {from: feed.mode === 'passed' ? 'review' : 'feed'}); showMatch(r.match); }
+  } catch (e) { toast(e.message || "Couldn't save that swipe. Check your internet."); }
+}
+
+/* after 5 swipes, once: invite people without a line to add one. Easy to dismiss (Not now, Escape, tap outside). */
+function maybeLinePrompt() {
+  if (S.lineAsked || !S.profile || S.profile.prompt || (S.feedSwipes || 0) < 5) return;
+  setTimeout(() => {
+    if (route !== 'app' || tab !== 'feed' || $('.sheet-bg', app) || $('.overlay', app)) return; // a match is showing: ask after the next swipe
+    S.lineAsked = true; save(); track('line_prompt');
+    sheet(`<h2>Give them something to reply to</h2>
+      <p class="sub">A short line makes your card stand out and gives a match an easy way to say hi. Keep it playful:</p>
+      <div class="examples">${[['anthem', 'Chogada Tara'], ['teach', 'the 3-clap step'], ['flag', 'Brings spare sticks']].map(([id, t]) => `<div class="pr"><small>${esc(label('prompt', id))}…</small>${esc(t)}</div>`).join('')}</div>
+      <button class="btn" id="lpGo">Add my line</button><button class="link" id="lpNo">Not now</button>`, s => {
+        $('#lpGo', s).onclick = () => { track('line_prompt_yes'); closeSheet(); openEdit('line'); };
+        $('#lpNo', s).onclick = closeSheet;
+      });
+  }, 450);
+}
+
+/* ---------- match ---------- */
+function sharedNights(p) { return (p.nights || []).filter(n => S.profile.nights.includes(n)).map(nightById).filter(n => n && n.date >= todayISO()); }
+const andList = xs => xs.length < 2 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
+function sticksSVG() {
+  const stick = (cls, bands, tassel) => `<g transform="translate(70 66)"><g class="stk ${cls}">
+    <rect x="-4.5" y="-56" width="9" height="112" rx="4.5" fill="#A8571C"/>
+    ${Array.from({length: 10}, (_, i) => `<rect x="-4.5" y="${(-46 + i * 9.6).toFixed(1)}" width="9" height="4.6" fill="${bands[i % bands.length]}"/>`).join('')}
+    <circle cy="-56" r="6" fill="#F4C24D"/><circle cy="56" r="6" fill="#F4C24D"/>
+    <path d="M0 61 l-6 13 M0 61 l0 15 M0 61 l6 13" stroke="${tassel}" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <circle cx="-6" cy="75" r="2.4" fill="#F4C24D"/><circle cx="0" cy="77" r="2.4" fill="#F4C24D"/><circle cx="6" cy="75" r="2.4" fill="#F4C24D"/></g></g>`;
+  return `<svg class="clash" viewBox="0 0 140 150" aria-hidden="true" focusable="false"><defs><radialGradient id="spk"><stop offset="0" stop-color="#FFF6C8"/><stop offset=".35" stop-color="#F4C24D" stop-opacity=".9"/><stop offset="1" stop-color="#F4C24D" stop-opacity="0"/></radialGradient></defs>
+    ${stick('l', ['#FF6B22', '#F4C24D', '#E0343F'], '#E0343F')}${stick('r', ['#0E9A8C', '#F4C24D', '#2346C8'], '#FF6B22')}<circle class="spark" cx="70" cy="66" r="17" fill="url(#spk)"/></svg>`;
+}
+/* why Picapool chat comes first, said softly: shown above the chat button */
+const CHAT_WHY = 'Your number stays private on Picapool chat.';
+function showMatch(m) {
+  const p = m.person, me = S.profile;
+  const shared = sharedNights(p);
+  buzz([30, 60, 30]);
+  const ov = document.createElement('div'); ov.className = 'overlay'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'New match');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const petals = reduce ? '' : `<div class="petals" aria-hidden="true">${Array.from({length: 26}, (_, i) => `<i class="petal" style="left:${(i * 37) % 100}%;background:${['#FF9B1F', '#FFB938', '#FF6B22', '#F4C24D'][i % 4]};animation-duration:${2.6 + (i % 5) * .45}s;animation-delay:${.35 + (i % 7) * .18}s"></i>`).join('')}</div>`;
+  ov.innerHTML = `${TORAN}${petals}<div class="body center" tabindex="0" aria-label="It's a match">${sticksSVG()}<div class="match-pics"><img src="${esc(me.photos[0])}" alt=""><img src="${esc(p.photos[0])}" alt=""></div>
+    <h1>Partner mil gaya!</h1><p class="sub">You and ${esc(p.name)}${shared.length ? `, both going ${andList(shared.map(n => n.day))}` : ''}.</p></div>
+    <div class="actions">${CONFIG.CHAT_ENABLED ? `<p class="why">${ICO.lock} ${CHAT_WHY}</p><button class="btn" id="mChat">Chat on Picapool</button><button class="btn ghost" id="mNum">Share numbers</button>`
+      : `<button class="btn" id="mNum">Share numbers</button>`}
+    <button class="link" id="mKeep">Keep swiping</button></div>`;
+  app.appendChild(ov);
+  modalA11y(ov, document.activeElement, () => $('#mKeep', ov).click());
+  S.seenMatchIds = [...new Set([...S.seenMatchIds, m.id])]; save();
+  $('#mChat', ov) && ($('#mChat', ov).onclick = () => { ov.remove(); chatFlow(m); });
+  $('#mNum', ov).onclick = () => { ov.remove(); numberPrivacy(m); };
+  $('#mKeep', ov).onclick = () => { ov.remove(); refreshNav(); };
+}
+const storeUrl = () => /iPhone|iPad|iPod/.test(navigator.userAgent) ? CONFIG.APP_STORE : CONFIG.PLAY_STORE;
+const meHasPicapool = () => !!S.user?.hasPicapool;
+/* Chat on Picapool:
+   1. you need a Picapool account first (your chats live in the app)
+   2. they're on Picapool too → the chat is created
+   3. they aren't yet → your message waits as a request: "Ananya is reviewing your message request" */
+function chatFlow(m) {
+  if (m.chatId) return openChat(m, null);
+  if (!meHasPicapool()) return setupPicapool(m);
+  if (m.chatRequest === 'sent') return requestPending(m);
+  if (m.chatRequest === 'received') return requestReceived(m);
+  composeSheet(m);
+}
+function setupPicapool(m) {
+  const p = m.person; track('chat_setup');
+  sheet(`<h2>One small step before you chat</h2>
+    <p class="sub">Your chats live in the Picapool app, which keeps your number private. Download it and sign up with +91 ${esc(S.phone)}. ${esc(p.name)} will be right here when you're back.</p>
+    <a class="btn" id="dl" href="${storeUrl()}" target="_blank" rel="noopener">Download Picapool</a>
+    <button class="btn ghost" id="suDone">I've signed up</button>
+    <div class="err" id="suErr" role="alert"></div>
+    ${isDemo() ? `<p class="small center" style="margin:0">Demo: the store link is a placeholder, and "I've signed up" only pretends.</p>` : ''}`, s => {
+      $('#dl', s).onclick = () => track('app_download_click', {from: 'chat_setup'});
+      $('#suDone', s).onclick = async () => {
+        const b = $('#suDone', s); b.disabled = true; b.textContent = 'Checking…';
+        let st = isDemo() ? 'found' : 'unavailable';
+        if (!isDemo()) { try { const r = await api.lookupPicapool(); st = r.status; if (r.user) S.user = {...S.user, ...r.user, adult: S.user.adult}; } catch (e) {} }
+        if (st !== 'found') {
+          b.disabled = false; b.textContent = "I've signed up";
+          $('#suErr', s).textContent = st === 'not_found' ? `We couldn't find a Picapool account on +91 ${S.phone} yet. If you've just signed up, give it a minute and try again.` : "We couldn't check right now. Try again in a minute.";
+          return;
+        }
+        S.user.hasPicapool = true; S.picapool = 'found'; save(); track('chat_setup_done'); closeSheet(); toast("You're all set"); chatFlow(m);
+      };
+    });
+}
+/* the opener uses only the nights you both picked */
+function openerText(p) {
+  const days = sharedNights(p).map(fmtDate);
+  if (!days.length) return "Hey, we matched! I'd love to go to Garba with you. Which night works for you?";
+  return `Hey, we matched! I'd love to go to Garba with you. I'm going on ${andList(days)}. ${days.length === 1 ? 'Does that work for you?' : 'Which of those works for you?'}`;
+}
+function composeSheet(m) {
+  const p = m.person;
+  const s = sheet(`<h2>Say hi to ${esc(p.name)}</h2>
+    <p class="sub">Good call. Picapool chat keeps your number private, so you two can get to know each other at your own pace.</p>
+    <div class="field" style="margin-top:6px"><label for="opener">Your first message. Edit it however you like.</label>
+      <textarea class="input" id="opener" rows="4" maxlength="300">${esc(openerText(p))}</textarea></div>
+    <button class="btn" id="send">${p.hasPicapool ? 'Send and open chat' : 'Send message'}</button><button class="link" id="cx">Cancel</button>`);
+  $('#send', s).onclick = () => { const t = $('#opener', s).value.replace(/\s+/g, ' ').trim(); openChat(m, t || null, $('#send', s)); };
+  $('#cx', s).onclick = closeSheet;
+}
+function requestPending(m) {
+  const n = esc(m.person.name);
+  sheet(`<h2>${n} is reviewing your message request</h2>
+    ${m.requestMessage ? `<div class="msg">${esc(m.requestMessage)}</div>` : ''}
+    <p class="sub">Your message is waiting for ${n} on Picapool. The chat opens as soon as they accept, and your match stays right here.</p>
+    <button class="btn" id="okR">Okay</button>`, s => { $('#okR', s).onclick = closeSheet; });
+}
+function requestReceived(m) {
+  const n = esc(m.person.name);
+  sheet(`<h2>${n} sent you a message</h2>
+    <p class="sub">Open the chat on Picapool to read it and reply. Your number stays private.</p>
+    <button class="btn" id="accR">Open the chat</button><button class="link" id="laterR">Later</button>`, s => {
+      $('#accR', s).onclick = () => openChat(m, null, $('#accR', s));
+      $('#laterR', s).onclick = closeSheet;
+    });
+}
+async function openChat(m, opener, btn) {
+  if (btn) btn.disabled = true;
+  track('chat_open', {withMessage: !!opener});
+  let r; try { r = await api.openChat(m.id, opener); }
+  catch (e) { if (btn) btn.disabled = false; if (e.code === 'need_account') { S.user.hasPicapool = false; save(); closeSheet(); return setupPicapool(m); } return toast(e.message); }
+  if (r.status === 'requested') {
+    m.chatRequest = 'sent'; m.requestMessage = opener || null; save(); track('chat_request_sent');
+    requestPending(m);
+  } else {
+    m.chatId = r.chatId; m.chatRequest = null; save();
+    const link = esc(r.deepLink || CONFIG.APP_DEEPLINK.replace('{chatId}', r.chatId));
+    sheet(`<h2>Your chat with ${esc(m.person.name)} is ready</h2>
+      <p class="sub">${opener ? 'Your message is in the chat. ' : ''}Open Picapool, logged in with +91 ${esc(S.phone)}, and pick up the conversation there.</p>
+      <a class="btn" href="${link}">Open Picapool</a>
+      <a class="btn ghost" href="${storeUrl()}" target="_blank" rel="noopener">Download Picapool</a>
+      ${isDemo() ? '<p class="small center" style="margin:10px 0 0">Demo: no real chat was created and nothing was sent.</p>' : ''}`);
+  }
+  if (route === 'app' && tab === 'matches') renderMatchesKeepSheet();
+}
+/* Share numbers: their choice, said kindly; numbers still show only when both agree */
+function numberPrivacy(m) {
+  const n = esc(m.person.name);
+  sheet(`<h2>Swap numbers with ${n}?</h2>
+    <p class="sub">Totally your call. Once you share your number, ${n} can reach you on it, even after Navratri. If you'd like to get to know each other a little first, Picapool chat keeps your number private until you're ready.</p>
+    <p class="small" style="margin:0 0 14px">Your number only shows once you both say yes.</p>
+    <button class="btn" id="pvNum">Share my number</button>
+    ${CONFIG.CHAT_ENABLED ? '<button class="link" id="pvChat">Chat on Picapool instead</button>' : '<button class="link" id="pvNo">Not now</button>'}`, s => {
+      $('#pvChat', s) && ($('#pvChat', s).onclick = () => { closeSheet(); chatFlow(m); });
+      $('#pvNo', s) && ($('#pvNo', s).onclick = closeSheet);
+      $('#pvNum', s).onclick = () => { closeSheet(); askNumber(m); };
+    });
+}
+async function askNumber(m) {
+  track('number_request');
+  let r; try { r = await api.shareNumber(m.id); } catch (e) { return toast(e.message); }
+  m.numberStatus = r.status; if (r.phone) m.phone = r.phone; save();
+  if (r.status === 'shared') sheet(`<h2>${esc(m.person.name)}'s number</h2>
+      <p class="sharetext" style="font-size:20px;font-weight:700;text-align:center">+91 ${esc(r.phone)}</p>
+      <a class="btn wa" href="https://wa.me/91${esc(r.phone)}" target="_blank" rel="noopener">${IC.wa} Message on WhatsApp</a>`);
+  else sheet(`<h2>Your number is ready to share</h2><p class="sub">${esc(m.person.name)} will see it once they say yes too. Until then it stays private.</p>
+      <button class="btn" id="okN">Okay</button>`, s => { $('#okN', s).onclick = closeSheet; });
+  if (route === 'app' && tab === 'matches') renderMatchesKeepSheet();
+}
+
+/* ---------- matches: Mutual (liked each other) · Likes you (they liked me, I haven't liked back) · Sent (I liked, waiting) ---------- */
+let matchesTab = 'mutual';
+const MATCH_TABS = [['mutual', 'Mutual'], ['received', 'Likes you'], ['sent', 'Sent']];
+function renderMatchesKeepSheet() { const sh = $('.sheet-bg', app); renderMatches(); if (sh) app.appendChild(sh); }
+function renderMatches() {
+  S.seenMatchIds = [...new Set([...S.seenMatchIds, ...S.matches.map(m => m.id)])]; save();
+  const mutual = matchesTab === 'mutual', idOf = t => 'tab-' + t;
+  app.innerHTML = frame({nav: true, body: `<main class="body"><h1>Your matches</h1>
+    <div class="tabs tabs3" role="tablist" aria-label="Matches">${MATCH_TABS.map(([t, label]) =>
+      `<button role="tab" id="${idOf(t)}" aria-selected="${matchesTab === t}" aria-controls="mPanel" tabindex="${matchesTab === t ? 0 : -1}">${label}</button>`).join('')}</div>
+    <div id="mPanel" role="tabpanel" aria-labelledby="${idOf(matchesTab)}">${mutual ? mutualHtml() : '<div class="spinner"></div>'}</div></main>`});
+  bindNav();
+  const order = MATCH_TABS.map(x => x[0]);
+  const pick = t => { if (matchesTab === t) return; matchesTab = t; track('matches_tab', {tab: t}); renderMatches(); $('#' + idOf(t)).focus(); };
+  order.forEach((t, i) => { const b = $('#' + idOf(t)); b.onclick = () => pick(t);
+    b.onkeydown = e => { const k = {ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: order.length - 1}[e.key]; if (k === undefined) return; e.preventDefault(); pick(order[(k + order.length) % order.length]); }; });
+  if (mutual) bindMutual(); else if (matchesTab === 'received') loadReceived(); else loadSent();
+}
+/* Likes you: they liked me, I haven't liked back. Like back = a normal right swipe, so it makes a match. */
+async function loadReceived() {
+  let r; try { r = await api.getReceivedLikes(); } catch (e) { if ($('#mPanel')) $('#mPanel').innerHTML = `<p class="sub center">${esc(e.message)}</p>`; return; }
+  if (matchesTab !== 'received' || !$('#mPanel')) return;
+  const list = r.received || [];
+  $('#mPanel').innerHTML = list.length
+    ? `<p class="small" style="margin:0 0 10px">They liked you. Like them back and it's a match.</p><div class="list">${list.map(({person: p, passed}) => { const sh = sharedNights(p);
+        return `<div class="row-card"><img src="${esc((p.photos || [])[0] || '')}" alt=""><div class="grow"><b>${esc(p.name)}</b>
+        <div class="small">${esc(p.college)}${sh.length ? ' · both going ' + sh.map(n => n.day).join(', ') : ''}</div>${passed ? '<div class="status" style="margin-top:4px">You passed earlier</div>' : ''}</div>
+        <div class="mbtns"><button class="sbtn pri" data-lb="${esc(p.id)}">Like back</button><button class="sbtn" data-nf="${esc(p.id)}">Not for me</button></div></div>`; }).join('')}</div>`
+    : `<div class="center" style="padding-top:32px"><p class="sub">When someone likes you before you've liked them, they show up here.</p><button class="btn" id="toFeed">Keep swiping</button></div>`;
+  track('likes_received_view', {n: list.length});
+  $('#toFeed') && ($('#toFeed').onclick = () => { tab = 'feed'; go('app'); });
+  $$('[data-lb]').forEach(b => b.onclick = () => likeBack(list.find(x => x.person.id === b.dataset.lb).person, b));
+  $$('[data-nf]').forEach(b => b.onclick = async () => {
+    b.disabled = true; try { await api.dismissLike(b.dataset.nf); track('like_dismiss'); loadReceived(); } catch (e) { b.disabled = false; toast(e.message); } });
+}
+async function likeBack(p, btn) {
+  if (rightsLeft() <= 0) return toast(`That's today's ${CONFIG.DAILY_RIGHT_CAP} likes. Back tomorrow!`);
+  btn.disabled = true;
+  let r; try { r = await api.swipe(p.id, 'right'); } catch (e) { btn.disabled = false; return toast(e.message); }
+  S.swipes[p.id] = {dir: 'right', at: Date.now(), retried: !!S.swipes[p.id]}; S.rightsByDay[todayISO()] = (S.rightsByDay[todayISO()] || 0) + 1;
+  if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday;
+  feed.queue = feed.queue.filter(x => x.id !== p.id); save(); track('like_back');
+  if (r.match) { S.matches = [r.match, ...S.matches.filter(m => m.id !== r.match.id)]; save(); track('match', {from: 'likes_you'}); showMatch(r.match); }
+  loadReceived();
+}
+function mutualHtml() {
+  if (!S.matches.length) return `<div class="center" style="padding-top:32px"><p class="sub">No matches yet. When someone you liked likes you back, they show up here.</p><button class="btn" id="toFeed">Start swiping</button></div>`;
+  return `${CONFIG.CHAT_ENABLED ? `<p class="why" style="justify-content:flex-start;margin:0 0 12px">${ICO.lock} ${CHAT_WHY}</p>` : ''}<div class="list">${S.matches.map(m => { const p = m.person, sh = sharedNights(p);
+    const chatLabel = m.chatId ? 'Open chat' : m.chatRequest === 'sent' ? 'Request sent' : m.chatRequest === 'received' ? 'Read message' : 'Chat on Picapool';
+    const chatNote = !m.chatId && m.chatRequest === 'sent' ? `<div class="status" style="margin-top:4px">${esc(p.name)} is reviewing your message request</div>`
+      : !m.chatId && m.chatRequest === 'received' ? `<div class="status" style="margin-top:4px">Sent you a message request</div>` : '';
+    const num = m.numberStatus === 'shared' ? `<a class="sbtn" href="https://wa.me/91${esc(m.phone)}" target="_blank" rel="noopener">+91 ${esc(m.phone)}</a>`
+      : m.numberStatus === 'waiting' ? '<span class="status">Number shared · waiting for them</span>' : '';
+    const acts = CONFIG.CHAT_ENABLED
+      ? `<button class="sbtn ${m.chatRequest === 'sent' && !m.chatId ? '' : 'pri'}" data-chat="${esc(m.id)}">${chatLabel}</button>${num || `<button class="sbtn" data-num="${esc(m.id)}">Share numbers</button>`}`
+      : (num || `<button class="sbtn pri" data-num="${esc(m.id)}">Share numbers</button>`);
+    return `<div class="row-card"><img src="${esc(p.photos[0])}" alt=""><div class="grow"><b>${esc(p.name)}</b>
+      <div class="small">${esc(p.college)}${sh.length ? ' · both going ' + sh.map(n => n.day).join(', ') : ''}</div>${chatNote}</div>
+      <div class="mbtns">${acts}</div></div>`; }).join('')}</div>`;
+}
+function bindMutual() {
+  $$('[data-chat]').forEach(b => b.onclick = () => chatFlow(S.matches.find(x => x.id === b.dataset.chat)));
+  $$('[data-num]').forEach(b => b.onclick = () => numberPrivacy(S.matches.find(m => m.id === b.dataset.num)));
+  $('#toFeed') && ($('#toFeed').onclick = () => { tab = 'feed'; go('app'); });
+}
+async function loadSent() {
+  let r; try { r = await api.getSentLikes(); } catch (e) { if ($('#mPanel')) $('#mPanel').innerHTML = `<p class="sub center">${esc(e.message)}</p>`; return; }
+  if (matchesTab !== 'sent' || !$('#mPanel')) return;
+  const list = r.sent || [];
+  $('#mPanel').innerHTML = list.length
+    ? `<p class="small" style="margin:0 0 10px">People you liked. If they like you back, they move to Mutual.</p><div class="list">${list.map(({person: p}) => `<div class="row-card"><img src="${esc((p.photos || [])[0] || '')}" alt=""><div class="grow"><b>${esc(p.name)}</b>
+        <div class="small">${esc(p.college)}</div><div class="status" style="margin-top:8px">Waiting for them</div></div></div>`).join('')}</div>`
+    : `<div class="center" style="padding-top:32px"><p class="sub">Nobody yet. People you like show up here until they like you back.</p><button class="btn" id="toFeed">Start swiping</button></div>`;
+  $('#toFeed') && ($('#toFeed').onclick = () => { tab = 'feed'; go('app'); });
+}
+
+/* ---------- leaderboard ---------- */
+let lb = {board: null, period: 'tonight'};
+async function renderBoard() {
+  lb.board ??= S.user.gender === 'female' ? 'queen' : 'king';
+  const t = tonight();
+  app.innerHTML = frame({nav: true, toran: true, body: `<main class="body"><h1 class="board-title">${lb.board === 'queen' ? CONFIG.BOARD_NAME.female : CONFIG.BOARD_NAME.male}</h1>
+    <p class="board-when">${lb.period === 'tonight' ? `Tonight, ${fmtDate(t)} Oct · ${esc(t.colour.toLowerCase())} night` : 'All of Navratri'}</p>
+    <div class="seg"><button data-b="queen" aria-pressed="${lb.board === 'queen'}">${CONFIG.BOARD_NAME.female}</button><button data-b="king" aria-pressed="${lb.board === 'king'}">${CONFIG.BOARD_NAME.male}</button></div>
+    <div class="seg sm"><button data-p="tonight" aria-pressed="${lb.period === 'tonight'}">${t.day} · ${t.colour} night</button><button data-p="week" aria-pressed="${lb.period === 'week'}">All Navratri</button></div>
+    <div id="lbBody"><div class="spinner"></div></div></main>`});
+  bindNav();
+  $$('[data-b]').forEach(b => b.onclick = () => { lb.board = b.dataset.b; renderBoard(); });
+  $$('[data-p]').forEach(b => b.onclick = () => { lb.period = b.dataset.p; renderBoard(); });
+  const want = lb.board + lb.period;
+  let r; try { r = await api.getLeaderboard(lb.board, lb.period); } catch (e) { if ($('#lbBody')) $('#lbBody').innerHTML = `<p class="sub center">${esc(e.message)}</p>`; return; }
+  if (!$('#lbBody') || want !== lb.board + lb.period) return;
+  if (lb.period === 'tonight' && lb.board === myBoardKey() && S.profile.inBoard) setCrown(r.me && r.me.rank ? {rank: r.me.rank, day: todayISO()} : null);
+  const top = r.top || [], pod = [[top[1], 2], [top[0], 1], [top[2], 3]];
+  const myBoard = (S.user.gender === 'female') === (lb.board === 'queen');
+  $('#lbBody').innerHTML = (top.length ? `<div class="podium">${pod.map(([p, rk]) => p ? `<div class="pod p${rk}"><img src="${esc(p.photo)}" alt=""><span class="rk">#${rk}</span><b>${esc(p.name)}</b><span>${esc(p.college)}</span></div>` : '<div></div>').join('')}</div>
+    ${top.slice(3).map((p, i) => `<div class="lb-row"><span class="n">${i + 4}</span><img src="${esc(p.photo)}" alt=""><div style="min-width:0"><b style="font-size:14px">${esc(p.name)}</b><div class="small">${esc(p.college)}</div></div>${p.isMe ? '<span class="me">YOU</span>' : ''}</div>`).join('')}`
+    : '<p class="sub center" style="margin-top:20px">No crowns yet. Start swiping!</p>')
+    + (myBoard ? myBoardCard(r.me) : '')
+    + `<p class="small center" style="margin-top:12px">Updates every minute.</p>`;
+  $('#joinLb') && ($('#joinLb').onclick = () => setBoard(true));
+  $('#shareRank') && ($('#shareRank').onclick = () => openShare('rank', r.me.rank, lb.period));
+}
+function myBoardCard(me) {
+  if (!S.profile.inBoard) return `<div class="mycard stitch"><b>You're not in the race</b><p class="small" style="margin:4px 0 10px">Top ${CONFIG.BOARD_SIZE} get crowned every night.</p><button class="btn" id="joinLb">Put me in</button></div>`;
+  if (!me) return '';
+  return `<div class="mycard stitch"><b>${me.rank ? `You're #${me.rank}` : `Not in the top ${CONFIG.BOARD_SIZE} yet`}</b>
+    <p class="small" style="margin:4px 0 ${me.rank ? '10px' : '0'}">${me.count} like${me.count === 1 ? '' : 's'} ${lb.period === 'tonight' ? 'today' : 'this Navratri'}. Only you see this.</p>
+    ${me.rank ? `<button class="btn gold" id="shareRank">Flaunt your crown</button>` : ''}</div>`;
+}
+async function setBoard(v) {
+  try { await api.setLeaderboard(v); S.profile.inBoard = v; save(); track('lb_opt', {v}); toast(v ? "You're in the race" : 'Removed from the board'); }
+  catch (e) { toast(e.message); const t = $('#lbT'); if (t) t.checked = !v; return; }
+  if (tab === 'board') renderBoard();
+}
+
+/* ---------- me ---------- */
+function renderMe() {
+  const me = {...S.profile, ...S.user, name: S.user.firstName, id: 'me'};
+  app.innerHTML = frame({nav: true, body: `<main class="body"><h1 class="sr-only">Your card</h1><div class="preview">${cardHtml(me, {preview: true})}</div>
+
+    <div class="menu">${hasCrown() ? `<button class="btn gold" id="flaunt">Flaunt your crown · #${S.crown.rank}</button>` : ''}
+      <button class="btn ${hasCrown() ? 'ghost' : ''}" id="shareMine">${IC.share} Share my Dandiya card</button>
+      <label class="toggle-row" for="lbT"><span>In the ${boardFor(S.user.gender)} race</span><span class="switch"><input type="checkbox" id="lbT" ${S.profile.inBoard ? 'checked' : ''}><i></i></span></label>
+      <h2 style="margin:10px 0 0">Your card</h2>
+      <div class="cardlist">${cardRows().map(([id, t, dsc, done]) => `<button data-ed="${id}"><span class="grow"><b>${t}</b><span class="d">${dsc}</span></span><span class="st${done ? '' : ' add'}">${done ? 'Edit' : 'Add'}</span></button>`).join('')}</div>
+      <button class="btn ghost" id="del" style="color:var(--red)">Delete Dandiya profile</button>
+      <p class="small center" style="margin:0">Your Dandiya card is deleted on ${+CONFIG.DELETE_ON.slice(8)} Oct.</p>
+      <button class="link" id="out">Log out</button></div></main>`});
+  bindNav();
+  $('#shareMine').onclick = () => openShare('partner');
+  $('#flaunt') && ($('#flaunt').onclick = () => openShare('rank', S.crown.rank, 'tonight'));
+  $('#lbT').onchange = e => setBoard(e.target.checked);
+  $$('[data-ed]').forEach(b => b.onclick = () => openEdit(b.dataset.ed));
+  $('#del').onclick = () => sheet(`<h2>Delete your Dandiya profile?</h2><p class="sub">Your card, photos, swipes and matches go. Your Picapool account stays.</p>
+    <button class="btn danger" id="yesDel">Yes, delete</button><button class="btn ghost" id="noDel" data-autofocus>Cancel</button>`, s => {
+      $('#noDel', s).onclick = closeSheet;
+      $('#yesDel', s).onclick = async () => { $('#yesDel', s).disabled = true; try { await api.deleteProfile(); } catch (e) { $('#yesDel', s).disabled = false; return toast(e.message); }
+        track('profile_deleted'); S.profile = null; S.draft = {}; S.swipes = {}; S.matches = []; S.seenMatchIds = []; S.step = null; feed.queue = []; save(); closeSheet(); go('landing'); toast('Dandiya profile deleted'); };
+    });
+  $('#out').onclick = () => { const ref = S.ref, entry = S.entry; S = Object.assign(freshState(), {ref, entry}); save(); feed.queue = []; feed.peekLoaded = false; tab = 'feed'; go('landing'); };
+}
+
+function cardRows() {
+  const p = S.profile;
+  return [
+    ['photos', 'Photos', `${(p.photos || []).length} of ${CONFIG.MAX_PHOTOS}`, true],
+    ['nights', 'Nights and where', esc((p.nights || []).map(nightById).filter(Boolean).map(n => n.day).join(', ')) + (p.venue ? ' · ' + esc(p.venue) : ''), true],
+    ['line', 'Your line', p.prompt ? esc(p.prompt.text) : 'Optional. Something to reply to', !!p.prompt],
+  ];
+}
+function openEdit(screen) {
+  S.draft = JSON.parse(JSON.stringify(S.profile)); delete S.draft.prompt; delete S.draft.thumb; save();
+  track('card_edit_open', {screen}); go(screen);
+}
+
+/* ---------- sheets ---------- */
+function modalA11y(dlg, prev, onEsc) {
+  dlg.setAttribute('aria-modal', 'true');
+  const h = dlg.querySelector('h1,h2'); if (h) { h.id ||= 'dlg' + Math.random().toString(36).slice(2, 7); dlg.setAttribute('aria-labelledby', h.id); }
+  dlg._prev = prev;
+  const focusables = () => [...dlg.querySelectorAll('button:not([disabled]),a[href],input:not([type=hidden]),select,textarea')].filter(e => e.offsetParent !== null);
+  dlg._esc = onEsc; dlg._focusables = focusables;
+  labelGroups(dlg);
+  /* first focus goes to the safe choice when there is one (Cancel, Keep peeking) */
+  setTimeout(() => { const f = dlg.querySelector('[data-autofocus]') || focusables()[0]; if (f && dlg.isConnected) f.focus({preventScroll: true}); }, 60);
+}
+/* one listener for the topmost dialog: Escape closes it, Tab stays inside it */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' && e.key !== 'Tab') return;
+  const dlg = [...document.querySelectorAll('[aria-modal=true]')].pop(); if (!dlg) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); const prev = dlg._prev; dlg._esc(); setTimeout(() => { if (!dlg.isConnected && (document.activeElement === document.body || !document.activeElement)) focusBack(prev); }, 80); return; }
+  const fs = dlg._focusables(); if (!fs.length) return;
+  const i = fs.indexOf(document.activeElement);
+  if (i === -1) { e.preventDefault(); fs[e.shiftKey ? fs.length - 1 : 0].focus(); }
+  else if (e.shiftKey && i === 0) { e.preventDefault(); fs[fs.length - 1].focus(); }
+  else if (!e.shiftKey && i === fs.length - 1) { e.preventDefault(); fs[0].focus(); }
+}, true);
+function sheet(html, bind) {
+  closeSheet();
+  const prev = document.activeElement;
+  const bg = document.createElement('div'); bg.className = 'sheet-bg'; bg.innerHTML = `<div class="sheet" role="dialog"><div class="grab"></div>${html}</div>`;
+  bg.onclick = e => { if (e.target === bg) closeSheet(); };
+  app.appendChild(bg); bind && bind(bg);
+  modalA11y(bg.firstElementChild, prev, closeSheet);
+  return bg;
+}
+/* after a dialog closes, put focus back where it was, or on the main action */
+function focusBack(p) {
+  const t = p && p.isConnected && p !== document.body ? p : $('#yep:not([disabled]), main h1, .body h1, #next', app);
+  if (t) { try { if (!t.matches('button,a,input,select,textarea')) t.tabIndex = -1; t.focus({preventScroll: true}); } catch (e) {} }
+}
+function closeSheet() { $$('.sheet-bg', app).forEach(x => { const p = x.firstElementChild?._prev; x.remove(); focusBack(p); }); }
+/* name each chip group after the question above it */
+function labelGroups(root) {
+  $$('[role=group]:not([aria-label]):not([aria-labelledby]), .chips[data-k]', root).forEach(g => {
+    const p = g.previousElementSibling; g.setAttribute('role', 'group');
+    if (p && /\b(q|lbl)\b/.test(p.className) && !g.hasAttribute('aria-label')) g.setAttribute('aria-label', p.textContent.trim());
+  });
+}
+function openReport(p) {
+  const reasons = ['Fake profile', 'Inappropriate photo', 'Looks under 18', 'Rude or harassing', 'Something else'];
+  sheet(`<h2>Report or block ${esc(p.name)}</h2><p class="sub">They won't know. The Picapool team checks every report.</p>
+    <div class="list">${reasons.map(r => `<button class="btn ghost" data-r="${r}" style="margin:0">${r}</button>`).join('')}</div>
+    <button class="link" id="justBlock">Just block, don't report</button>`, s => {
+      const done = async reason => {
+        try { reason ? await api.report(p.id, reason) : await api.block(p.id); } catch (e) {}
+        S.blocked.push(p.id); feed.queue = feed.queue.filter(x => x.id !== p.id); save(); track(reason ? 'report' : 'block', {reason});
+        closeSheet(); drawStack(); toast(reason ? 'Reported and blocked' : 'Blocked'); };
+      $$('[data-r]', s).forEach(b => b.onclick = () => done(b.dataset.r));
+      $('#justBlock', s).onclick = () => done(null);
+    });
+}
+
+/* =====================================================================
+   SHARING: WhatsApp text first (works everywhere), status image second
+   ===================================================================== */
+function shareText(kind, rank, period) {
+  const ns = S.profile.nights.map(nightById).filter(n => n && n.date >= todayISO());
+  if (kind === 'rank') {
+    const n = tonight();
+    return `👑 #${rank} ${boardFor(S.user.gender)} ${period === 'tonight' ? `tonight (${n.colour.toLowerCase()} night)` : 'of Navratri'}\n${S.user.firstName}, ${S.user.college}\n\nApna partner dhoondo: ${shareLink()}`;
+  }
+  const verb = S.user.gender === 'female' ? 'rahi' : 'raha';
+  return `Dandiya partner dhoondh ${verb} hoon. ${ns.map(n => n.day).join(', ')}.\n\n${shareLink()}`;
+}
+async function openShare(kind, rank, period) {
+  if (kind !== 'rank') return openInvite();
+  period = period || 'tonight';
+  const crown = kind === 'rank';
+  track('share_open', {kind});
+  const text = shareText(kind, rank, period);
+  const s = sheet(`<h2 class="${crown ? 'display' : ''}">${crown ? 'Flaunt your crown' : 'Share your Dandiya card'}</h2>
+
+    <div id="shWrap"><div class="spinner"></div></div>
+    <div id="shMain"></div>
+    <a class="btn wa" id="shWa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">${IC.wa} Send on WhatsApp</a>
+    <button class="btn ghost" id="shLink">Copy link</button>
+`);
+  $('#shWa', s).onclick = () => track('share', {kind, via: 'wa_text'});
+  $('#shLink', s).onclick = () => {
+    const link = shareLink();
+    const done = () => { toast('Link copied. On Instagram, add it with the Link sticker.'); track('share', {kind, via: 'copy_link'}); };
+    const fallback = () => { const w = $('#shMain', s); w.insertAdjacentHTML('beforeend', `<div class="sharetext">${esc(link)}</div>`); const r = document.createRange(); r.selectNodeContents(w.lastElementChild); const g = getSelection(); g.removeAllRanges(); g.addRange(r); toast('Link selected. Tap Copy.'); };
+    if (!canClipboard()) return fallback();
+    try { navigator.clipboard.writeText(link).then(done, fallback); } catch (e) { fallback(); }
+  };
+  try {
+    const c = await makeShareCard(kind, rank, period);
+    const blob = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/png'));
+    if (!document.body.contains(s)) return;
+    const file = new File([blob], crown ? 'picapool-crown.png' : 'picapool-dandiya.png', {type: 'image/png'});
+    const url = URL.createObjectURL(blob);
+    const canFile = !!(navigator.canShare && (() => { try { return navigator.canShare({files: [file]}); } catch (e) { return false; } })());
+    $('#shWrap', s).innerHTML = `<img class="poster" src="${url}" alt="${crown ? 'Your crown poster' : 'Your Dandiya card poster'}">`;
+    const cls = crown ? 'btn gold' : 'btn';
+    $('#shMain', s).innerHTML = canFile ? `<button class="${cls}" id="shStory">Post to story</button>`
+      : TOP ? `<a class="${cls}" href="${url}" download="${file.name}" id="shSave">Save image</a>`
+      : '<p class="small center" style="margin:0 0 12px">Long-press the image to save it.</p>';
+    $('#shStory', s) && ($('#shStory', s).onclick = async () => { try { await navigator.share({files: [file], text: crown ? '' : text}); track('share', {kind, via: 'story'}); } catch (e) {} });
+    $('#shSave', s) && ($('#shSave', s).onclick = () => track('share', {kind, via: 'save'}));
+  } catch (e) { if (document.body.contains(s)) $('#shWrap', s).innerHTML = '<p class="small center">Couldn’t make the image here. Send the link instead.</p>'; }
+}
+/* invite: the referral link is the main way to share; the story image is the second option */
+const canShareLink = () => { try { return TOP && !!navigator.share; } catch (e) { return false; } };
+function copyLink(link, where, onDone) {
+  const fallback = () => { where.innerHTML = `<div class="sharetext">${esc(link)}</div>`; const r = document.createRange(); r.selectNodeContents(where.firstElementChild); const g = getSelection(); g.removeAllRanges(); g.addRange(r); toast('Link selected. Tap Copy.'); };
+  if (!canClipboard()) return fallback();
+  try { navigator.clipboard.writeText(link).then(onDone, fallback); } catch (e) { fallback(); }
+}
+async function openInvite() {
+  track('share_open', {kind: 'partner'});
+  const link = shareLink(), text = shareText('partner');
+  const s = sheet(`<h2>Share your invite link</h2>
+    <p class="sub" style="margin-bottom:6px">Friends who join from your link can find their partners too.</p>
+    <div class="linkbox"><code>${esc(link.replace(/^https?:\/\//, ''))}</code></div>
+    <div id="lkSel"></div>
+    ${canShareLink() ? `<button class="btn" id="shInvite">${IC.link} Share invite link</button><button class="btn ghost" id="shLink">Copy invite link</button>`
+      : `<button class="btn" id="shLink">${IC.link} Copy invite link</button>`}
+    <a class="btn wa" id="shWa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">${IC.wa} Send on WhatsApp</a>
+    <div class="divider">Or post a story</div>
+    <div id="shWrap"><div class="spinner"></div></div><div id="shMain"></div>`);
+  $('#shInvite', s) && ($('#shInvite', s).onclick = async () => { try { await navigator.share({title: 'Stick Together', text: text.replace(link, '').trim(), url: link}); track('share', {kind: 'partner', via: 'invite_link'}); } catch (e) {} });
+  $('#shLink', s).onclick = () => copyLink(link, $('#lkSel', s), () => { toast('Invite link copied'); track('share', {kind: 'partner', via: 'copy_link'}); });
+  $('#shWa', s).onclick = () => track('share', {kind: 'partner', via: 'wa_text'});
+  try {
+    const c = await makeShareCard('partner');
+    const blob = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/png'));
+    if (!document.body.contains(s)) return;
+    const file = new File([blob], 'picapool-dandiya.png', {type: 'image/png'});
+    const url = URL.createObjectURL(blob);
+    const canFile = !!(navigator.canShare && (() => { try { return navigator.canShare({files: [file]}); } catch (e) { return false; } })());
+    $('#shWrap', s).innerHTML = `<img class="poster" src="${url}" alt="Your Dandiya card poster">`;
+    $('#shMain', s).innerHTML = canFile ? '<button class="btn ghost" id="shStory">Post to story</button>'
+      : TOP ? `<a class="btn ghost" href="${url}" download="${file.name}" id="shSave">Save image</a>`
+      : '<p class="small center" style="margin:0 0 12px">Long-press the image to save it.</p>';
+    $('#shStory', s) && ($('#shStory', s).onclick = async () => { try { await navigator.share({files: [file], text}); track('share', {kind: 'partner', via: 'story'}); } catch (e) {} });
+    $('#shSave', s) && ($('#shSave', s).onclick = () => track('share', {kind: 'partner', via: 'save'}));
+  } catch (e) { if (document.body.contains(s)) $('#shWrap', s).innerHTML = '<p class="small center">Couldn’t make the image here. Share the link instead.</p>'; }
+}
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); if (/^https?:/.test(src)) i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = rej; i.src = src; });
+function cover(ctx, img, x, y, w, h) { const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, ir = iw / ih, r = w / h; let sw = iw, sh = ih, sx = 0, sy = 0;
+  if (ir > r) { sw = ih * r; sx = (iw - sw) / 2; } else { sh = iw / r; sy = (ih - sh) / 2.6; } ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h); }
+function archPath(x, X, Y, w, h, foot = 30) { const r = w / 2; x.beginPath(); x.moveTo(X, Y + r); x.arc(X + r, Y + r, r, Math.PI, 0); x.lineTo(X + w, Y + h - foot); x.quadraticCurveTo(X + w, Y + h, X + w - foot, Y + h); x.lineTo(X + foot, Y + h); x.quadraticCurveTo(X, Y + h, X, Y + h - foot); x.closePath(); }
+/* 1080×1920 story poster. Safe zones: nothing important in the top 150px or bottom 170px (Instagram UI). */
+async function makeShareCard(kind, rank, period) {
+  try { await Promise.all([document.fonts.load('400 120px "Yatra One"'), document.fonts.load('800 80px Poppins'), document.fonts.load('600 40px Poppins'), document.fonts.load('500 40px Poppins')]); } catch (e) {}
+  const W = 1080, H = 1920, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const crown = kind === 'rank', t = tonight();
+  const P = (w, px) => `${w} ${px}px Poppins, system-ui, sans-serif`, Y = px => `400 ${px}px "Yatra One", Georgia, serif`;
+  const fit = (text, font, px, maxW) => { let sz = px; x.font = font(sz); while (x.measureText(text).width > maxW && sz > 20) { sz -= 2; x.font = font(sz); } return sz; };
+  const glow = (cx, cy, r, col) => { const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(26,15,36,0)'); x.fillStyle = g; x.fillRect(0, 0, W, H); };
+  const goldGrad = (y0, y1) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, '#FFE9A8'); g.addColorStop(.55, '#F4C24D'); g.addColorStop(1, '#D9922B'); return g; };
+  // night ground, tonight's glow, bandhani dots
+  x.fillStyle = '#1A0F24'; x.fillRect(0, 0, W, H);
+  glow(W / 2, 260, 980, hexA(t.hex, t.hex === '#FFFFFF' ? .26 : .5));
+  glow(W / 2, H + 120, 1050, 'rgba(255,107,34,.34)');
+  x.fillStyle = 'rgba(255,243,230,.075)'; // bandhani: clusters of four dots
+  for (let yy = 22, row = 0; yy < H; yy += 44, row++) for (let xx = row % 2 ? 44 : 22; xx < W; xx += 44) for (const [dx, dy] of [[0, -4], [0, 4], [-4, 0], [4, 0]]) { x.beginPath(); x.arc(xx + dx, yy + dy, 2.1, 0, 7); x.fill(); }
+  try { const tor = await loadImg(toranSVG(t.hex)); for (let xx = -30; xx < W; xx += 120) x.drawImage(tor, xx, 0, 120, 80); } catch (e) {}
+  // logo (white)
+  const logo = await loadImg(LOCKUP); const lw = 290, lh = lw * logo.height / logo.width; const lc = document.createElement('canvas'); lc.width = lw; lc.height = lh;
+  const lx = lc.getContext('2d'); lx.drawImage(logo, 0, 0, lw, lh); lx.globalCompositeOperation = 'source-in'; lx.fillStyle = '#FFF3E6'; lx.fillRect(0, 0, lw, lh);
+  x.drawImage(lc, (W - lw) / 2, 168);
+  x.textAlign = 'center';
+  let aY;
+  if (crown) {
+    const pre = period === 'tonight' ? `Tonight's` : `Navratri's`;
+    x.fillStyle = '#FFE08A'; x.font = P(600, 46); x.fillText(pre, W / 2, 322);
+    const title = boardFor(S.user.gender);
+    fit(title, Y, 158, W - 110); x.fillStyle = goldGrad(360, 500); x.shadowColor = 'rgba(244,194,77,.45)'; x.shadowBlur = 40; x.fillText(title, W / 2, 468); x.shadowBlur = 0;
+    aY = 540;
+  } else {
+    x.fillStyle = '#FFF3E6'; fit('Looking for a', Y, 104, W - 140); x.fillText('Looking for a', W / 2, 348);
+    x.fillStyle = goldGrad(380, 480); fit('Dandiya partner', Y, 120, W - 120); x.fillText('Dandiya partner', W / 2, 466);
+    aY = 540;
+  }
+  // photo in a jharokha arch, ringed with mirror work
+  const aw = 560, ah = 680, aX = (W - aw) / 2, r = aw / 2;
+  const nightCols = (crown ? [t] : S.profile.nights.map(nightById).filter(Boolean));
+  const mirror = (px, py, i) => { const col = i % 2 ? (nightCols[(i >> 1) % nightCols.length] || t).hex : '#F4C24D'; x.fillStyle = col; x.beginPath(); x.arc(px, py, i % 2 ? 8 : 10, 0, 7); x.fill();
+    x.fillStyle = 'rgba(255,255,255,.55)'; x.beginPath(); x.arc(px - 3, py - 3, 2.6, 0, 7); x.fill(); };
+  let k = 0; const off = 40;
+  for (let a = 180; a <= 360; a += 11.25) { const rad = a * Math.PI / 180; mirror(aX + r + Math.cos(rad) * (r + off), aY + r + Math.sin(rad) * (r + off), k++); }
+  for (let yy = aY + r + 44; yy < aY + ah - 10; yy += 44) { mirror(aX - off, yy, k); mirror(aX + aw + off, yy, k + 1); k += 2; }
+  x.save(); x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = 60; x.shadowOffsetY = 30; archPath(x, aX, aY, aw, ah); x.fillStyle = '#251733'; x.fill(); x.restore();
+  const ph = await loadImg(S.profile.photos[0]);
+  x.save(); archPath(x, aX, aY, aw, ah); x.clip(); cover(x, ph, aX, aY, aw, ah); x.restore();
+  x.lineWidth = 10; x.strokeStyle = goldGrad(aY, aY + ah); archPath(x, aX - 5, aY - 5, aw + 10, ah + 10, 34); x.stroke();
+  x.lineWidth = 2.5; x.strokeStyle = 'rgba(255,224,138,.8)'; archPath(x, aX + 14, aY + 14, aw - 28, ah - 28, 22); x.stroke();
+  let y = aY + ah;
+  if (crown) { // rank medallion
+    const mr = 88; x.fillStyle = '#1A0F24'; x.beginPath(); x.arc(W / 2, y, mr + 10, 0, 7); x.fill();
+    x.fillStyle = goldGrad(y - mr, y + mr); x.beginPath(); x.arc(W / 2, y, mr, 0, 7); x.fill();
+    x.fillStyle = '#2A1A00'; x.font = P(800, 84); x.textBaseline = 'middle'; x.fillText('#' + rank, W / 2, y + 4); x.textBaseline = 'alphabetic';
+    y += mr + 96;
+  } else y += 110;
+  x.fillStyle = '#FFF3E6'; fit(S.user.firstName, n => P(800, n), 92, W - 160); x.fillText(S.user.firstName, W / 2, y);
+  y += 62; x.fillStyle = '#BEAFC3'; fit(S.user.college, n => P(500, n), 40, W - 160); x.fillText(S.user.college, W / 2, y);
+  y += 78;
+  if (crown) {
+    const line = period === 'tonight' ? `${fmtDate(t)} Oct · ${t.colour} night` : 'Navratri 2026 · North Campus';
+    x.font = P(600, 36); const tw = x.measureText(line).width, pw = tw + 110, ph2 = 72, px0 = (W - pw) / 2;
+    x.fillStyle = 'rgba(255,243,230,.08)'; x.beginPath(); x.roundRect ? x.roundRect(px0, y - 50, pw, ph2, 36) : x.rect(px0, y - 50, pw, ph2); x.fill();
+    x.strokeStyle = 'rgba(255,243,230,.24)'; x.lineWidth = 2; x.stroke();
+    if (period === 'tonight') { x.fillStyle = t.hex; x.beginPath(); x.arc(px0 + 42, y - 14, 13, 0, 7); x.fill(); }
+    x.fillStyle = '#FFF3E6'; x.fillText(line, W / 2 + (period === 'tonight' ? 18 : 0), y);
+  } else {
+    const ns = S.profile.nights.map(nightById).filter(nn => nn && nn.date >= todayISO()).slice(0, 6); const step = 126; let sx = W / 2 - (ns.length - 1) * step / 2;
+    y += 10; x.font = P(600, 28);
+    ns.forEach(nn => { x.fillStyle = nn.hex; x.beginPath(); x.arc(sx, y, 18, 0, 7); x.fill(); x.fillStyle = '#FFF3E6'; x.fillText(nn.day, sx, y + 52); sx += step; });
+  }
+  x.fillStyle = '#BEAFC3'; x.font = P(500, 34); x.fillText(crown ? 'Find your Dandiya partner on Picapool' : 'Swipe for me on Picapool', W / 2, H - 262);
+  x.fillStyle = '#FF8A4C'; x.font = P(700, 44); x.fillText(CONFIG.SHARE_URL.replace(/^https?:\/\//, ''), W / 2, H - 204);
+  return c;
+}
+
+/* ---------------- Picapool sync ----------------
+   Someone may leave to create their Picapool account and come back. Whenever the page comes back into view (and once at boot)
+   we ask the server, which asks Picapool; Picapool's backend can also push changes (HANDOFF §4b). */
+let ppSyncAt = 0;
+async function syncPicapool(force) {
+  if (isDemo() || !S.token || (!force && Date.now() - ppSyncAt < (S.user?.hasPicapool ? 5 * 60e3 : 20e3))) return;
+  ppSyncAt = Date.now();
+  let r; try { r = await api.lookupPicapool(); } catch (e) { return; }
+  if (!r.user || (r.status !== 'found' && !S.user?.hasPicapool)) return;
+  const before = S.user || {};
+  S.user = {...before, ...r.user, adult: !!(before.adult || r.user.adult)};
+  if (r.status === 'found') S.picapool = 'found';
+  save(); track('picapool_synced', {status: r.status, nameChanged: !!r.synced?.nameChanged, conflict: r.synced?.conflict || null});
+  if (route === 'account' && !$('.sheet-bg', app)) go('account');
+  else if (route === 'app' && tab === 'me') renderMe();
+  if (r.synced?.nameChanged && S.profile) toast(`Your name now matches your Picapool account: ${S.user.firstName}`);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncPicapool(); });
+
+/* ---------------- boot ---------------- */
+document.addEventListener('keydown', e => {
+  if (!['ArrowLeft', 'ArrowRight'].includes(e.key) || e.altKey || e.metaKey || e.ctrlKey) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || $('.sheet-bg, .overlay', app)) return;
+  if (route === 'preview' || (route === 'app' && tab === 'feed')) { e.preventDefault(); flyTop(e.key === 'ArrowRight' ? 'right' : 'left'); }
+});
+(function boot() {
+  applyTheme(getTheme());
+  const tn = tonight(), root = document.documentElement.style;
+  root.setProperty('--tonight', tn.hex);
+  root.setProperty('--toran', `url("${toranSVG(tn.hex)}")`);
+  if (S.ageBlocked) return go('blocked');
+  if (!upcomingNights().length) return go('ended');
+  if (S.token) setTimeout(() => syncPicapool(true), 1500);
+  if (S.token && S.user && S.profile) return go('app');
+  if (S.token && S.step && ONBOARD.indexOf(S.step) > 0) return go(nextStepAfterLogin());
+  go('landing');
+})();
+</script>
+</body>
+</html>

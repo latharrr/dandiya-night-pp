@@ -1,0 +1,18 @@
+{
+  "name": "picapool-stick-together",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Picapool Navratri Dandiya partner match: page + API in one Node server. No dependencies.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "DEV_OTP=1234 node server.js",
+    "seed:test": "node seed.js 20",
+    "seed:remove": "node seed.js --remove",
+    "test": "node test/api.test.js",
+    "export": "node export.js"
+  }
+}
