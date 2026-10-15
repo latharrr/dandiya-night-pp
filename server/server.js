@@ -97,6 +97,8 @@ CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
 for (const col of ['req_by TEXT', 'req_opener TEXT', 'req_at INTEGER']) { try { db.exec(`ALTER TABLE matches ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
 // build k: identity sync with Picapool, and "Not for me" on likes you received
 for (const col of ['identity_conflict TEXT', 'picapool_synced_at INTEGER']) { try { db.exec(`ALTER TABLE users ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
+// v3: who someone wants to dance with: 'male' | 'female' | 'everyone' (empty = the other gender, as before)
+try { db.exec('ALTER TABLE users ADD COLUMN pref TEXT'); } catch (e) { /* already there */ }
 db.exec(`CREATE TABLE IF NOT EXISTS dismissed(from_id TEXT, to_id TEXT, at INTEGER, PRIMARY KEY(from_id, to_id))`);
 // v2.1: indexes for the lookups that run on every poll (pairs by either side, reports per person, sessions per user)
 db.exec(`CREATE INDEX IF NOT EXISTS matches_b ON matches(b);
@@ -145,7 +147,12 @@ function cleanPlans(list) {
 const plansOf = p => Array.isArray(p?.plans) ? p.plans : [];
 const datesOf = p => [...new Set(plansOf(p).flatMap(x => x.dates))].sort();
 
-function userJson(u) { return u ? {id: u.id, firstName: u.first_name || '', gender: u.gender || null, college: u.college || '', adult: !!u.adult, hasPicapool: !!u.picapool_id} : null; }
+/* Gender preference. Two people see each other only when each is someone the other wants to dance with. */
+const PREFS = ['male', 'female', 'everyone'];
+const prefOf = u => PREFS.includes(u?.pref) ? u.pref : (u?.gender === 'female' ? 'male' : u?.gender === 'male' ? 'female' : null);
+const wants = (a, b) => { const p = prefOf(a); return p === 'everyone' || p === b.gender; };
+const mutual = (a, b) => !!a.gender && !!b.gender && wants(a, b) && wants(b, a);
+function userJson(u) { return u ? {id: u.id, firstName: u.first_name || '', gender: u.gender || null, pref: u.gender ? prefOf(u) : null, college: u.college || '', adult: !!u.adult, hasPicapool: !!u.picapool_id} : null; }
 function profileOf(userId) { const r = q('SELECT data FROM profiles WHERE user_id=?').get(userId); return r ? JSON.parse(r.data) : null; }
 function card(u, p) {
   return {id: u.id, name: u.first_name, college: u.college, photos: p.photos, plans: plansOf(p), lookingFor: p.lookingFor, skill: p.skill,
@@ -225,21 +232,26 @@ route('GET', '/api/stats', ({req, url}) => {
 let previewCache = {};
 const SAMPLES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'samples.json'), 'utf8')); } catch (e) { return {female: [], male: []}; } })();
 route('GET', '/api/preview', ({url}) => {
-  const gender = url.searchParams.get('gender') === 'male' ? 'male' : 'female';
-  const key = gender + ':' + istDay();
+  // gender = who to show (male | female | everyone); me = the viewer's own gender, if known: then only people who'd want to dance with them
+  const gp = url.searchParams.get('gender'), gender = PREFS.includes(gp) ? gp : 'female', genders = gender === 'everyone' ? ['female', 'male'] : [gender];
+  const meG = ENUMS.gender.includes(url.searchParams.get('me')) ? url.searchParams.get('me') : null, viewer = meG ? {gender: meG, pref: gender} : null;
+  const key = gender + ':' + (meG || '') + ':' + istDay();
   const c = previewCache[key]; if (c && now() - c.at < C.PREVIEW_CACHE_MS) return c.body;
-  const rows = q(`SELECT u.id, u.first_name, u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1 AND u.gender=?`).all(gender);
+  const rows = q(`SELECT u.id, u.first_name, u.college, u.gender, u.pref, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1`).all()
+    .filter(r => genders.includes(r.gender) && (!viewer || mutual(viewer, r)));
   const eligible = rows.map(r => ({r, p: JSON.parse(r.data)}));
-  const order = [...rankBoard(gender, 'tonight'), ...rankBoard(gender, 'week')].map(x => x.id);
+  const order = genders.flatMap(g => [...rankBoard(g, 'tonight')]).concat(genders.flatMap(g => rankBoard(g, 'week'))).map(x => x.id);
   const pos = id => { const i = order.indexOf(id); return i < 0 ? Infinity : i; };
   const rest = shuffle(eligible.filter(({r}) => pos(r.id) === Infinity), key);
   let list = [...eligible.filter(({r}) => pos(r.id) < Infinity).sort((a, b) => pos(a.r.id) - pos(b.r.id)), ...rest];
   list = list.slice(0, C.PREVIEW_MAX).map(({r, p}) => ({id: r.id, name: r.first_name, college: r.college, dates: datesOf(p), prompt: p.prompt || null, photo: p.photos[0]}));
   if (C.SAMPLE_PROFILES && list.length < C.PREVIEW_MAX) {
     const today = istDay(), upcoming = DATES.filter(d => d >= today);
-    const fill = (SAMPLES[gender] || []).slice(0, C.PREVIEW_MAX - list.length).map((x, i) => {
+    const pool = genders.length > 1 ? (SAMPLES.female || []).flatMap((x, i) => [[x, 'female', i], ...((SAMPLES.male || [])[i] ? [[SAMPLES.male[i], 'male', i]] : [])])
+      : (SAMPLES[gender] || []).map((x, i) => [x, gender, i]);
+    const fill = pool.slice(0, C.PREVIEW_MAX - list.length).map(([x, g, i]) => {
       const ds = upcoming.filter((_, k) => (k + i) % 2 === 0).slice(0, 2);
-      return {id: `sample-${gender[0]}${i + 1}`, name: x.name, college: x.college, dates: ds.length ? ds : upcoming.slice(0, 1), prompt: x.line ? {id: 'flag', text: x.line} : null, photo: x.photo, sample: true};
+      return {id: `sample-${g[0]}${i + 1}`, name: x.name, college: x.college, dates: ds.length ? ds : upcoming.slice(0, 1), prompt: x.line ? {id: 'flag', text: x.line} : null, photo: x.photo, sample: true};
     });
     list = [...list, ...fill];
   }
@@ -367,11 +379,34 @@ route('POST', '/api/account', async ({req, body}) => {
   const college = clean(body.college, 60); if (college.length < 2) bad('Pick your college.');
   if (gender === 'male' && WOMEN_ONLY_COLLEGES.includes(college.toLowerCase())) bad('Pick your college.');
   if (body.adult !== true) bad('This is for 18+ only.');
+  const pref = PREFS.includes(body.pref) ? body.pref : (u.pref || null);
   let picapoolId = u.picapool_id;
   if (!picapoolId) { try { picapoolId = await integrations.createPicapoolAccount({phone: u.phone, firstName, gender, college, ref: u.ref}); } catch (e) { console.error('[createPicapoolAccount]', e.message); } }
-  q('UPDATE users SET first_name=?, gender=?, college=?, adult=1, picapool_id=?, completed_at=COALESCE(completed_at, ?) WHERE id=?')
-    .run(firstName, gender, college, picapoolId ? String(picapoolId) : null, now(), u.id);
+  q('UPDATE users SET first_name=?, gender=?, pref=?, college=?, adult=1, picapool_id=?, completed_at=COALESCE(completed_at, ?) WHERE id=?')
+    .run(firstName, gender, pref, college, picapoolId ? String(picapoolId) : null, now(), u.id);
   if (picapoolId && !u.picapool_id) deliverRequests(u.id).catch(e => console.error('[deliverRequests]', e.message));
+  return {user: userJson(q('SELECT * FROM users WHERE id=?').get(u.id))};
+});
+
+/* Change "I'm a guy / girl" and/or "who I want to dance with" from the profile.
+   A new gender clears picks, pairs and "not for me" (both directions): they were made as the other side. Photos, events and the line stay.
+   A new preference alone keeps everything. Gender can't change while linked to Picapool (its gender wins there). */
+route('POST', '/api/account/gender', ({req, body}) => {
+  const u = authUser(req); needComplete(u);
+  const gender = body.gender === undefined ? u.gender : body.gender, pref = body.pref === undefined ? (u.pref || null) : body.pref;
+  if (!ENUMS.gender.includes(gender)) bad('Pick Girl or Guy.');
+  if (pref !== null && !PREFS.includes(pref)) bad('Pick who you want to dance with.');
+  if (pref !== u.pref) q('UPDATE users SET pref=? WHERE id=?').run(pref, u.id);
+  if (gender === u.gender) { bustCaches(); return {user: userJson(q('SELECT * FROM users WHERE id=?').get(u.id))}; }
+  if (u.picapool_id && u.gender) bad('Your gender comes from your Picapool account. Change it in the Picapool app.', 409);
+  if (gender === 'male' && WOMEN_ONLY_COLLEGES.includes(String(u.college || '').toLowerCase())) bad('Pick a co-ed college first (Profile → College), then switch.');
+  tx(() => {
+    q('UPDATE users SET gender=? WHERE id=?').run(gender, u.id);
+    q('DELETE FROM swipes WHERE from_id=? OR to_id=?').run(u.id, u.id);
+    q('DELETE FROM matches WHERE a=? OR b=?').run(u.id, u.id);
+    q('DELETE FROM dismissed WHERE from_id=? OR to_id=?').run(u.id, u.id);
+  });
+  bustCaches();
   return {user: userJson(q('SELECT * FROM users WHERE id=?').get(u.id))};
 });
 
@@ -479,7 +514,7 @@ route('GET', '/api/feed', ({req, url}) => {
   const t = now();
   const swiped = new Map(q('SELECT to_id, dir, at, retried FROM swipes WHERE from_id=?').all(u.id).map(r => [r.to_id, r]));
   const blocked = new Set(q('SELECT to_id x FROM blocks WHERE from_id=? UNION SELECT from_id x FROM blocks WHERE to_id=?').all(u.id, u.id).map(r => r.x));
-  const rows = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.gender=? AND u.adult=1 AND u.id<>?`).all(u.gender === 'female' ? 'male' : 'female', u.id);
+  const rows = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1 AND u.id<>?`).all(u.id).filter(r => mutual(u, r));
   let list = [];
   for (const r of rows) {
     if (blocked.has(r.id)) continue;
@@ -520,7 +555,7 @@ route('POST', '/api/swipe', async ({req, body}) => {
   const u = authUser(req); needProfile(u);
   const dir = body.dir === 'right' ? 'right' : body.dir === 'left' ? 'left' : bad('Bad swipe.');
   const target = q(`SELECT u.* FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=? AND ${VISIBLE('p')}`).get(String(body.targetId || ''));
-  if (!target || target.id === u.id || target.gender === u.gender) bad('That profile is no longer available.', 404);
+  if (!target || target.id === u.id || !mutual(u, target)) bad('That profile is no longer available.', 404);
   if (blockedPair(u.id, target.id)) bad('That profile is no longer available.', 404);
   const prev = q('SELECT * FROM swipes WHERE from_id=? AND to_id=?').get(u.id, target.id);
   if (prev && prev.dir === 'right') return {match: null, rightsLeftToday: Math.max(0, C.DAILY_RIGHT_CAP - rightsUsedToday(u.id))};
@@ -550,7 +585,7 @@ route('GET', '/api/likes/received', ({req}) => {
      WHERE s.to_id=? AND s.dir='right' AND (mine.dir IS NULL OR mine.dir<>'right')
        AND NOT EXISTS (SELECT 1 FROM dismissed d WHERE d.from_id=? AND d.to_id=s.from_id)
      ORDER BY s.at DESC`).all(u.id, u.id, u.id);
-  return {received: rows.filter(r => !blockedPair(u.id, r.from_id)).map(r => ({person: card(r, JSON.parse(r.data)), at: r.at, passed: r.mydir === 'left'}))};
+  return {received: rows.filter(r => !blockedPair(u.id, r.from_id) && mutual(u, r)).map(r => ({person: card(r, JSON.parse(r.data)), at: r.at, passed: r.mydir === 'left'}))};
 });
 route('POST', '/api/likes/dismiss', ({req, body}) => {
   const u = authUser(req); needProfile(u);

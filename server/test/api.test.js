@@ -257,6 +257,38 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
     const csv = await fetch(B + '/admin/export.csv', {headers: {'X-Admin-Key': 'dev-admin'}}); const ct = await csv.text();
     ok(csv.status === 200 && /text\/csv/.test(csv.headers.get('content-type')) && ct.includes('"9877755555","Tara"') && ct.includes('Hansraj Garba (16 Oct 20:00)'), 'CSV export lists signups with their events');
     ok(!ct.includes('53000000'), 'CSV skips test profiles'); }
+  // picked the wrong side at sign-up: switch, with picks and pairs cleared, photos and events kept
+  { const x = await login('9877788881'), y = await login('9877788882');
+    await j('POST', '/account', {firstName: 'Deep', gender: 'female', college: 'Hindu College', adult: true}, x); await j('PUT', '/profile', {photos: [jpg], plans: PL}, x);
+    await j('POST', '/account', {firstName: 'Neha', gender: 'female', college: 'Hindu College', adult: true}, y); await j('PUT', '/profile', {photos: [jpg], plans: PL}, y);
+    const xid = sql("SELECT id FROM users WHERE phone='9877788881'")[0].id;
+    sql(`INSERT INTO swipes(from_id, to_id, dir, day, at) VALUES(?,?,?,?,?)`, xid, 'u_whoever', 'right', '2026-10-15', Date.now());
+    const sw = await j('POST', '/account/gender', {gender: 'male'}, x);
+    ok(sw.s === 200 && sw.o.user.gender === 'male' && sql('SELECT COUNT(*) n FROM swipes WHERE from_id=?', xid)[0].n === 0, 'switch to guy: gender changed, old picks cleared');
+    { const pr = (await j('GET', '/feed', null, x)).o.profiles.map(p => p.name); ok(pr.includes('Neha') && (await j('GET', '/feed', null, y)).o.profiles.some(p => p.name === 'Deep'), 'after switching he sees girls, and girls see him'); }
+    ok((await j('PUT', '/profile', {photos: [jpg], plans: PL}, x)).s === 200, 'pass still works after switching');
+    ok((await j('POST', '/account/gender', {gender: 'robot'}, x)).s === 400, 'only girl or guy');
+    sql("UPDATE users SET college='Miranda House' WHERE id=?", sql("SELECT id FROM users WHERE phone='9877788882'")[0].id);
+    ok((await j('POST', '/account/gender', {gender: 'male'}, y)).s === 400, "can't switch to guy with a women-only college");
+    sql("UPDATE users SET picapool_id='pp_x' WHERE id=?", xid);
+    ok((await j('POST', '/account/gender', {gender: 'female'}, x)).s === 409, 'linked to Picapool: gender comes from Picapool');
+    ok((await j('POST', '/account/gender', {gender: 'male'})).s === 401, 'switch needs login'); }
+  // gender preference: two people see each other only when each wants the other's gender
+  { const mk = async (ph, name, gender, pref) => { const t = await login(ph); const a = await j('POST', '/account', {firstName: name, gender, pref, college: 'Hindu College', adult: true}, t); await j('PUT', '/profile', {photos: [jpg], plans: PL}, t); return [t, a.o.user]; };
+    const [ta, ua] = await mk('9866600001', 'Asha', 'female', 'everyone'), [tb] = await mk('9866600002', 'Bina', 'female', 'everyone');
+    const [tc, uc] = await mk('9866600003', 'Chirag', 'male', undefined), [td] = await mk('9866600004', 'Dia', 'female', undefined);
+    ok(ua.pref === 'everyone' && uc.pref === 'female', 'preference saved; empty = the other gender (' + ua.pref + ', ' + uc.pref + ')');
+    const names = async t => (await j('GET', '/feed', null, t)).o.profiles.map(p => p.name);
+    const fa = await names(ta), fd = await names(td), fc = await names(tc);
+    ok(fa.includes('Bina') && fa.includes('Chirag') && !fa.includes('Dia'), 'girl dancing with everyone: sees a girl who wants everyone and a guy, not a girl who wants guys (' + fa.join(',') + ')');
+    ok(fd.includes('Chirag') && !fd.includes('Asha') && !fd.includes('Bina'), 'girl dancing with guys sees only guys');
+    ok(fc.includes('Asha') && fc.includes('Dia') && !fc.includes('Chirag'), 'guy dancing with girls sees girls, including one who dances with everyone');
+    const did = sql("SELECT id FROM users WHERE phone='9866600004'")[0].id;
+    ok((await j('POST', '/swipe', {targetId: did, dir: 'right'}, ta)).s === 404, "can't pick someone who doesn't want your gender");
+    { const pv = await j('GET', '/preview?gender=everyone&me=female'); const n = pv.o.profiles.map(p => p.name); ok(!n.includes('Dia') && n.length > 0, 'guest peek for "everyone" respects what others want (' + n.join(',') + ')'); }
+    const ch = await j('POST', '/account/gender', {pref: 'everyone'}, td); ok(ch.s === 200 && ch.o.user.pref === 'everyone' && ch.o.user.gender === 'female', 'preference changed from the profile, gender kept');
+    ok((await names(ta)).includes('Dia'), 'now they see each other');
+    for (const ph of ['9866600001', '9866600002', '9866600003', '9866600004']) { const id = sql('SELECT id FROM users WHERE phone=?', ph)[0].id; sql('DELETE FROM profiles WHERE user_id=?', id); } }
   // the real senders, against a fake WhatsApp + MSG91 (a third server with every sender configured)
   { const http = require('node:http'); const got = []; let waFail = false;
     const fake = http.createServer((req, res) => { let b = ''; req.on('data', c => b += c); req.on('end', () => { got.push({url: req.url, auth: req.headers.authorization || req.headers.authkey, body: b ? JSON.parse(b) : null});
