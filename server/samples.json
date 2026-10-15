@@ -4,52 +4,30 @@
     {
       "name": "Ananya",
       "college": "Miranda House",
-      "nights": [
-        "d5",
-        "d7"
-      ],
       "line": "Here for the dhol. Staying for the garba.",
       "photo": "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Ishita",
       "college": "Hindu College",
-      "nights": [
-        "d4",
-        "d5",
-        "d8"
-      ],
       "line": "Teach me one new step and we're even.",
       "photo": "https://images.unsplash.com/photo-1706943262473-fc393f495501?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Kavya",
       "college": "Kirori Mal College",
-      "nights": [
-        "d5",
-        "d6"
-      ],
       "line": "Teen taali or nothing.",
       "photo": "https://images.unsplash.com/photo-1708182564325-fb1d3a3864d3?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Riya",
       "college": "Daulat Ram College",
-      "nights": [
-        "d4",
-        "d9"
-      ],
       "line": "",
       "photo": "https://images.unsplash.com/photo-1624610806209-82a4cbb4339a?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Simran",
       "college": "Indraprastha College for Women",
-      "nights": [
-        "d6",
-        "d7",
-        "d8"
-      ],
       "line": "Bringing my own sticks.",
       "photo": "https://images.unsplash.com/photo-1739429942851-9083ee185d3d?auto=format&fit=crop&w=720&h=960&q=75"
     }
@@ -58,50 +36,30 @@
     {
       "name": "Aditya",
       "college": "Hansraj College",
-      "nights": [
-        "d5",
-        "d7"
-      ],
       "line": "My mom rates my garba 'decent'. Tough critic.",
       "photo": "https://images.unsplash.com/photo-1729157661483-ed21901ed892?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Kabir",
       "college": "Ramjas College",
-      "nights": [
-        "d4",
-        "d6"
-      ],
       "line": "Dhol over DJ, every time.",
       "photo": "https://images.unsplash.com/photo-1589386417686-0d34b5903d23?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Arjun",
       "college": "SGTB Khalsa College",
-      "nights": [
-        "d5",
-        "d6",
-        "d8"
-      ],
       "line": "I'll carry the spare sticks.",
       "photo": "https://images.unsplash.com/photo-1694871420416-9feeb629dda4?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Rohan",
       "college": "Hindu College",
-      "nights": [
-        "d4",
-        "d9"
-      ],
       "line": "",
       "photo": "https://images.unsplash.com/photo-1637651808680-d054b0744fe8?auto=format&fit=crop&w=720&h=960&q=75"
     },
     {
       "name": "Nikhil",
       "college": "Kirori Mal College",
-      "nights": [
-        "d7"
-      ],
       "line": "Still learning. Patient teachers welcome.",
       "photo": "https://images.unsplash.com/photo-1782323709687-43675cbddd46?auto=format&fit=crop&w=720&h=960&q=75"
     }

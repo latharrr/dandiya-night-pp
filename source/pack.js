@@ -7,7 +7,7 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const root = path.resolve(__dirname, '..');
 const out = path.resolve(process.argv[2] || 'dandiya-nights-code.js');
-const SKIP = new Set(['.git', 'node_modules', 'out', 'data']);
+const SKIP = new Set(['.git', 'node_modules', 'out', 'data', '.env']); // .env holds real keys: never in the bundle
 const BUILD = (fs.readFileSync(path.join(root, 'source', 'build.py'), 'utf8').match(/BUILD = '([^']+)'/) || [])[1] || '?';
 const files = [];
 (function walk(dir) {

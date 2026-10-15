@@ -1,7 +1,7 @@
 # Dandiya Nights: Tech Handoff
-Picapool's Navratri app for North Campus. People see who's going to garba on their nights, pair up, and chat or swap numbers on Picapool. Guests can peek at tonight's top 5 before signing up; the picks they make there are sent once they make their pass.
+Picapool's Navratri app for North Campus. **Find your Dandiya partner:** people say which garba events they're going to (and when), see who else is going, pair up and swap numbers. Guests can peek at tonight's top 5 before signing up; the picks they make there are sent once they make their pass.
 
-Build `2026-10-15-v2.1` · 15 Oct 2026 (v2.1: team feedback round 1) · Built on Stick Together build k (same server, same Picapool sync), with the approved v2 design and flow.
+Build `2026-10-15-v3` · 15 Oct 2026 (v3: launch build, team feedback round 2) · Built on Stick Together build k (same server, same Picapool sync), with the approved v2 design.
 
 ## What you've got (3 files)
 | File | What it is |
@@ -12,28 +12,35 @@ Build `2026-10-15-v2.1` · 15 Oct 2026 (v2.1: team feedback round 1) · Built on
 
 ```bash
 node 2-dandiya-nights-code.js          # → ./dandiya-nights/
-cd dandiya-nights/server && npm test   # 160 checks, ends with "ALL CHECKS PASSED"
+cd dandiya-nights/server && npm test   # 194 checks, ends with "ALL CHECKS PASSED"
 ```
 
-## 0. Do this (Picapool tech team)
-The product side is finished and tested: every screen works in demo mode and against the real server. What's left needs Picapool's systems, accounts or decisions.
+## 0. What's left before the public link
+The product is finished and tested (194 server checks, plus a real-browser run of the whole flow on a phone and a laptop). Login codes, pair alerts and photos work with nothing but env vars. What's left:
 
 | # | Task | Where | Time |
 |---|---|---|---|
-| 1 | Unpack, run `npm test` | above, §2 | 10 min |
-| 2 | **Wire the OTP sender (WhatsApp).** Launch blocker: nobody can log in without it | `integrations.js` → `sendOtp` | 30 to 60 min |
-| 3 | **Decide how people get Picapool accounts** (Option A or B in §4b) and wire it | `integrations.js` → `createPicapoolAccount` | 1 h |
-| 4 | Wire the account lookup, then set `lookupWired: true` | `integrations.js` → `findPicapoolUser` | 30 min |
-| 5 | Make Picapool's backend **push account changes** to `POST /api/integrations/picapool-user`; set `PICAPOOL_WEBHOOK_SECRET` on both sides | Picapool backend, §4b | 1 h |
-| 6 | Wire the Picapool chat, **or** set `CONFIG.CHAT_ENABLED = false` (pairs can only swap numbers) | `integrations.js` → `createChat` | 1 to 3 h, or 1 min |
-| 7 | Wire the two WhatsApp notices: new pair, and a message request for someone not on Picapool yet. The reveal screen promises "We'll message you on WhatsApp when someone pairs with you" | `notifyMatch`, `notifyMessageRequest` | 1 h |
-| 8 | Deploy to `dandiya.picapool.tech` with a persistent disk | §3 | 30 min |
-| 9 | Set store links, deep link, Terms and Privacy links, venues | page `CONFIG` (§5) | 10 min |
-| 10 | **Replace the sample photos** in `server/samples.json` with your own licensed or AI-generated photos (the current ones are Unsplash placeholders) | `server/samples.json` | 30 min |
-| 11 | **Purav decides on counts.** v2 shows "184 girls from North Campus are going" (sign-up) and "26 girls are going on your nights" (reveal). Build k's rule was "never show counts". To turn them off: `SHOW_COUNTS=0` (the page then shows the same lines without a number) | env var | 1 min |
-| 12 | Run the phone checklist | §13 | 30 min |
+| 1 | **Put the WhatsApp + MSG91 values in the server's env** (token, Phone Number ID, template names, MSG91 key + template id). Check `GET /api/health` shows `"otp":["whatsapp","sms"]` | §3b | 10 min |
+| 2 | **Deploy on our server** with a persistent disk: `NODE_ENV=production`, long random `ADMIN_KEY`, `TRUST_PROXY=1`, `DATA_DIR`. DNS: `dandiya.picapool.tech` → the server (an A/CNAME record in the Vercel DNS for picapool.tech). HTTPS + `client_max_body_size 3m` in nginx | §3 | 30 min |
+| 3 | **Replace the sample photos** in `server/samples.json` (Unsplash placeholders), or `SAMPLE_PROFILES=0` | `server/samples.json` | 30 min |
+| 4 | **Purav: counts** ("184 guys from North Campus are going"). On by default; `SHOW_COUNTS=0` hides the number | env var | 1 min |
+| 5 | Run the phone checklist on one Android (opened from WhatsApp) and one iPhone | §13 | 30 min |
+| 6 | Every night: `/admin` → Top 20 check before posting the boards; **Download signups (CSV)** for Picapool | §10 | 10 min |
 
-Without steps 3 to 7 the site still runs end to end and never lies to anyone: it says "Couldn't check Picapool right now", keeps first messages as requests, and numbers can still be swapped. Step 2 has no fallback.
+**Later, with Picapool's backend** (the site works fully without these; nothing on the page depends on them):
+account lookup (`findPicapoolUser` + `lookupWired: true` + `CONFIG.PICAPOOL_LOOKUP = true`), account creation (`createPicapoolAccount`), the push to `/api/integrations/picapool-user`, and in-app chat (`createChat` + `CONFIG.CHAT_ENABLED = true`). Until then: pairs swap numbers, and signups go to Picapool via the CSV.
+
+## 0a. What changed in v3 (15 Oct, launch build)
+**Events replace nights.** "Which nights are you going?" is gone. The pass screen is now **"Where are you going for garba?"**: people pick every event they're going to (multiple choice) or type their own, then for each one the **day(s)** and **time** they're getting there. Events that 2+ people chose are suggested to everyone (one-off or misspelt names never are). Up to 5 events. Cards, the profile, pairs ("Both going to Hansraj Garba, Sat 17"), the paired screen, sharing and the story image all use events. Guests only see the days people are going, never where.
+**Matching.** The feed shows everyone now (no "My nights / All nights"): people going to the same event on the same day first, then the same event or the same day, then everyone else. Event names match loosely (case, spaces, punctuation).
+**Landing page.** Headline **"Find your *Dandiya partner.*"** as the main thing on the page; the three icon rows are gone; the arched-window dandiya illustration is replaced by a light outline heart. The dandiya-sticks icon (pair-up button, Pairs tab, paired screen) is an outline heart too.
+**Swiping fixed.** The card no longer lets the browser take over a slightly diagonal swipe (that snapped cards back on phones); a quick flick counts; the next card is drawn the moment one leaves, so fast swipes and taps never hit a card on its way out; each card commits exactly once; if saving fails, the card comes back instead of being lost. ← / → and mouse drag on laptops.
+**Photos.** Each photo uploads on its own the moment it's picked (`POST /api/photos`), so requests stay small (under a proxy's 1 MB default) and nothing is lost if the connection drops halfway through five. Unused uploads are cleaned up after an hour. The server refuses to start on serverless hosts or a read-only `DATA_DIR`, where photos would vanish.
+**Login codes, ready to switch on.** WhatsApp (Meta Cloud API, Authentication template with a copy-code button) first, **MSG91 SMS** as the fallback; if WhatsApp fails the code goes by SMS automatically, and the code screen offers **"Send by SMS instead"** after 30 s. The screen says how it was sent. **New-pair WhatsApp alert** to the other person. All by env vars (§3b).
+**Chat and the Picapool check are off** until Picapool's backend is connected (`CHAT_ENABLED`, `PICAPOOL_LOOKUP` in the page): pairs swap numbers, and nobody sees "Checking for a Picapool account".
+**Links filled in:** Play Store (`com.picapool`), App Store (`id6480370782`), Terms and Privacy on picapool.com. The 18+ and "wrap" pages link to the right store for the phone.
+**Laptops:** tonight's Garba Queen and Garba King (top 5 each, live) sit to the right of the app.
+**Admin:** **Download signups (CSV)** (number, name, gender, college, invite link, events) and "Events people are going to".
 
 ## 0b. What changed from build k (v2)
 **Design.** Two surfaces only: a wine "night" for the welcome and sign-up, calm cream inside the app. Titles in DM Serif Display with an italic second line ("Which nights / *are you going?*"), text in Figtree, both embedded (no font server). Picapool orange is the one big action on night screens; wine is the action colour inside the app. No day/night toggle any more.
@@ -75,11 +82,11 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 | Path | What it is |
 |---|---|
 | `server/server.js` | The whole backend: API, page hosting, photos, admin. Node 22.13+, **no npm install** (built-in SQLite) |
-| `server/integrations.js` | **The only file to edit to connect Picapool.** 6 functions + 1 flag, each with a safe default |
+| `server/integrations.js` | Login codes (WhatsApp + MSG91), the new-pair WhatsApp alert (both set by env vars, §3b), and the Picapool stubs to fill in later (§4) |
 | `server/samples.json` | Sample people for the guest peek (replace the photos, §0 step 10) |
 | `server/public/index.html` | The page, already in live mode. Mobile-first, full screen on phones, a centred column on laptops |
 | `server/public/admin.html` | `/admin`: numbers, nightly top-20 check, reports, Picapool clashes, hide/unhide |
-| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 160 checks. Never touches real data |
+| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 194 checks (including the WhatsApp and MSG91 messages against a fake server). Never touches real data |
 | `server/seed.js` · `export.js` · `Dockerfile` | Fake test profiles (`npm run seed:test` / `seed:remove`) · CSV of accounts (`npm run export`) · Docker |
 | `demo.html` | Same as `3-demo.html` |
 | `source/` | `template.html` (the one source for the page), `build.py`, logo files, `fonts/` (DM Serif Display + Figtree, SIL Open Font License). After a change: `python3 source/build.py` rewrites `server/public/index.html` and `demo.html` |
@@ -89,7 +96,7 @@ Without steps 3 to 7 the site still runs end to end and never lies to anyone: it
 ## 2. Run locally
 ```bash
 cd server
-npm test                 # 160 checks
+npm test                 # 194 checks
 npm run seed:test        # 20 fake girls + 20 fake guys (phones start with 5)
 npm run dev              # http://localhost:8080 · login code is always 1234 · codes print in the log
 ```
@@ -97,12 +104,21 @@ Use two browsers (or normal + incognito), a girl and a guy, and pick each other 
 
 ## 3. Deploy
 One Node process serves everything: page `/`, API `/api/*`, photos `/photos/*`, admin `/admin`.
-**Needs a persistent disk** (SQLite + photos in `DATA_DIR`). Vercel/Netlify functions won't work; use a VPS, the Picapool server, Render/Railway with a volume, or Docker with a volume on `/data`.
+**Needs a persistent disk** (SQLite + photos in `DATA_DIR`). Vercel/Netlify functions won't work (the server refuses to start there); use a VPS, the Picapool server, Render/Railway with a volume, or Docker with a volume on `/data`. The DNS for picapool.tech can stay on Vercel: just point `dandiya` at this server.
 ```bash
 NODE_ENV=production ADMIN_KEY=<long-random> PICAPOOL_WEBHOOK_SECRET=<long-random> DATA_DIR=/var/lib/dandiya-nights PORT=8080 TRUST_PROXY=1 node server.js
 # keep it running: pm2 start server.js --name dandiya-nights   (or systemd, or Docker)
+# or keep the settings in a file: cp .env.example .env, fill it in, npm run start:env
 ```
-HTTPS on `dandiya.picapool.tech` via nginx or Caddy. **One instance only** (SQLite is single-writer); plenty for North Campus. Floater links work as `dandiya.picapool.tech/shraddha` or `?ref=shraddha`; both are saved as the signup's `ref`.
+HTTPS on `dandiya.picapool.tech` via nginx or Caddy. nginx:
+```nginx
+server {
+  server_name dandiya.picapool.tech;
+  client_max_body_size 3m;            # one photo per request (~0.3 MB); nginx's default 1 MB is enough, this leaves room
+  location / { proxy_pass http://127.0.0.1:8080; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }
+}
+```
+**One instance only** (SQLite is single-writer); plenty for North Campus. Floater links work as `dandiya.picapool.tech/shraddha` or `?ref=shraddha`; both are saved as the signup's `ref`.
 
 | Env var | Default | Notes |
 |---|---|---|
@@ -125,16 +141,38 @@ HTTPS on `dandiya.picapool.tech` via nginx or Caddy. **One instance only** (SQLi
 | `SESSION_DAYS` | `30` | How long a login lasts |
 | `OTP_PER_IP_HOUR`, `VERIFY_PER_IP_HOUR` | `40`, `120` | Codes requested / tried per network per hour. Raise if a whole hostel signs up at once from one Wi-Fi |
 | `DEV_OTP` | — | Fixed login code for local testing. Only works with `NODE_ENV=development` or `test` |
+| `PREVIEW_CACHE_MS` | `120000` | How often the guest peek is recomputed |
+
+### 3b. Login codes and WhatsApp alerts (env vars, no code changes)
+| Env var | Example | What it is |
+|---|---|---|
+| `WHATSAPP_TOKEN` | `EAAG…` | Permanent access token of a system user with `whatsapp_business_messaging`, assigned to the WABA |
+| `WHATSAPP_PHONE_NUMBER_ID` | `1234567890` | WhatsApp Manager → API Setup → **Phone Number ID** (not the number itself) |
+| `WHATSAPP_OTP_TEMPLATE` | `dandiya_login_code` | Approved **Authentication** template. The code fills `{{1}}` and the copy-code button |
+| `WHATSAPP_OTP_LANG` | `en` | The template's language code exactly as approved (`en`, `en_US`, `hi`…) |
+| `WHATSAPP_OTP_BUTTON` | `1` | `0` only if the template has no copy-code / one-tap button |
+| `WHATSAPP_MATCH_TEMPLATE` | `dandiya_new_pair` | Approved **Utility** template for "you have a new pair". Off when empty |
+| `WHATSAPP_MATCH_LANG` | `en` | Its language code |
+| `WHATSAPP_MATCH_VARS` | `me,name` | What fills `{{1}}`, `{{2}}`… in order. `me` = the person getting the message, `name` = their new pair, `college` = the pair's college, `link` = `APP_URL`. Example body: "Hi {{1}}, {{2}} picked you back on Dandiya Nights 💃 Open it to swap numbers." → `me,name` |
+| `WHATSAPP_MATCH_BUTTON_VAR` | `link` | Only if the template has a URL button with a variable |
+| `WHATSAPP_API_VERSION` | `v23.0` | Graph API version |
+| `MSG91_AUTH_KEY` | | MSG91 → API → Auth key |
+| `MSG91_TEMPLATE_ID` | `6612…` | **MSG91's** template id (not the DLT id) of the template linked to the approved DLT template. The code is `##OTP##` |
+| `MSG91_MODE` | `otp` | `otp` if the template is under MSG91 → OTP; `flow` if it's under SMS → Templates |
+| `MSG91_OTP_VAR` | `OTP` | Flow mode only: the variable name the template uses for the code |
+| `OTP_CHANNELS` | `whatsapp,sms` | Order to try. A channel is used only when its env vars are set. `sms,whatsapp` = SMS first |
+| `APP_URL` | `https://dandiya.picapool.tech` | Used for `link` in WhatsApp templates |
+The WhatsApp **app secret** isn't needed (it only verifies incoming webhooks, and this server receives none). Check after deploy: `curl https://dandiya.picapool.tech/api/health` → `"otp":["whatsapp","sms"]`. A failed send is logged as `[otp] whatsapp failed for +91 98xxxxxx10: <Meta's error>` and the next channel is tried. For MSG91, the template text must match the DLT text character for character, or operators drop the SMS while the API still says "success".
 
 ## 4. Connect Picapool (`server/integrations.js`)
 | Function / flag | Called when | If you don't wire it |
 |---|---|---|
-| `sendOtp(phone, code)` | Someone asks for a login code | **Launch blocker.** Production throws; the page says "Couldn't send the code" |
+| `sendOtp(phone, code, prefer)` | Someone asks for a login code | **Done.** WhatsApp, then MSG91 SMS (§3b). With neither set, production refuses to send (dev prints the code) |
 | `lookupWired` (flag) + `findPicapoolUser(phone)` → `{picapoolId, firstName?, gender?, college?}` or null | After the code, on "I've signed up", when the page comes back into view, every 5 min while linked | The page skips the "We found your Picapool account" card and carries on. It never claims "no account" unless the lookup really ran |
 | `createPicapoolAccount({phone, firstName, gender, college, ref})` → id | Someone picks their college (that saves the account) | No account is made. Run `npm run export -- --unlinked > new.csv` nightly. **This is the main KPI** |
-| `createChat(from, to, opener)` → chatId | Both have Picapool and one sends the first message (with the plan line, if they added one), or someone joins Picapool with a message request waiting | Placeholder id; the app link opens nothing. **Set `CONFIG.CHAT_ENABLED = false`** until ready |
-| `notifyMessageRequest(to, from)` | Someone sends `to` a first message but `to` isn't on Picapool yet | Only logs. **Wire it**: the sender's page says "{name} is reviewing your message request", so `to` must actually hear about it |
-| `notifyMatch(to, other)` | A new pair | They see it next time the page is open (checked every 45 s). The reveal screen promises a WhatsApp message, so wire it |
+| `createChat(from, to, opener)` → chatId | Both have Picapool and one sends the first message (with the plan line, if they added one), or someone joins Picapool with a message request waiting | Not reachable at launch: `CONFIG.CHAT_ENABLED = false` (pairs swap numbers). Wire it, then set it to `true` |
+| `notifyMessageRequest(to, from)` | Someone sends `to` a first message but `to` isn't on Picapool yet | Only with chat on. Wire it (a WhatsApp template) before turning chat on |
+| `notifyMatch(to, other)` | A new pair | **Done.** WhatsApp template from `WHATSAPP_MATCH_TEMPLATE` (§3b). Without it, they see the pair next time the page is open (checked every 45 s) |
 
 ## 4b. How Dandiya Nights and the Picapool app stay in sync
 Unchanged from build k. **The phone number is the join key.** The same 10-digit number on the web and in the app is the same person. `users.picapool_id` is set once they're linked.
@@ -145,7 +183,7 @@ Unchanged from build k. **The phone number is the join key.** The same 10-digit 
 | First name | **Picapool** (first word of the app name) | Chats happen in the app; both sides must show the same name |
 | Gender | **Picapool**, *before* the pass exists. After that it is never changed automatically (see clash rules) | Feed, picks, pairs and the board all depend on it |
 | College | **Dandiya Nights** (Picapool's college only fills an empty one) | Event-specific choice, made on the college screen |
-| Photos, nights, where, line, race, pause, picks, pairs | **Dandiya Nights** | Event data, deleted on 20 Oct |
+| Photos, events (name, days, time), line, race, pause, picks, pairs | **Dandiya Nights** | Event data, deleted on 20 Oct |
 | Date of birth | Never stored anywhere here; only `adult: true` | Privacy |
 
 **When linking happens**
@@ -183,48 +221,53 @@ X-Picapool-Secret: <PICAPOOL_WEBHOOK_SECRET>
 ## 5. Page settings (`CONFIG` at the top of the script in `server/public/index.html`; source: `source/template.html`)
 | Key | Set to |
 |---|---|
-| `PLAY_STORE`, `APP_STORE` | Real store links (currently `REPLACE_ME`) |
-| `APP_DEEPLINK` | Same pattern as the `DEEPLINK` env var |
-| `TERMS_URL`, `PRIVACY_URL` | **New.** Real links (shown on the nights screen, next to "Agree and see who's going") |
-| `VENUES` | **Purav:** the real North Campus events ("Where, mostly?" and the plan in "Say hi"). Keep "Not sure yet" last |
-| `PLAN_TIMES` | **New.** Times offered in the plan |
+| `PLAY_STORE`, `APP_STORE` | Set: `com.picapool` and `id6480370782` |
+| `TERMS_URL`, `PRIVACY_URL` | Set: picapool.com/terms-and-conditions/ and /privacy-policy/ (shown next to "Agree and see who's going") |
+| `CHAT_ENABLED` | `false` at launch (pairs swap numbers). `true` once `createChat` is wired |
+| `PICAPOOL_LOOKUP` | `false` at launch (no "Checking for a Picapool account"). `true` once `findPicapoolUser` is wired and `lookupWired: true` |
+| `APP_DEEPLINK` | Only used with chat on. Same pattern as the `DEEPLINK` env var |
+| `EVENT_SUGGESTIONS` | Optional starter event names shown on the events screen before people add their own (empty: events 2+ people chose are suggested automatically) |
+| `MAX_PLANS` (5) | Events per person. Must match `C.MAX_PLANS` |
+| `TIMES` | Times offered for each event (`'19:30'` style), 5 pm to 10 pm |
 | `SHARE_URL` | `https://dandiya.picapool.tech` |
-| `CHAT_ENABLED` | `false` until `createChat` is wired |
 | `COLLEGES_COED`, `COLLEGES_WOMEN` | Guys see the co-ed list only; girls see both. "Other college" lets anyone type theirs |
 | `MAX_PHOTOS` (5), `BOARD_SIZE` (20) | Must match `C.MAX_PHOTOS`, `C.BOARD_SIZE` in `server.js` |
 | `GUEST_PEEK_LIMIT` (5) | People a guest can see before making a pass |
-| `NIGHTS` | Navratri 2026. Keep in step with `NIGHT_DATES` in `server.js` |
+| `NIGHTS` | Navratri 2026: the days people can pick for an event, and each day's colour. Keep in step with `DATES` in `server.js` |
 Don't change `MODE` (`'live'`) or `API_BASE` (`'/api'`).
 
 ## 6. Screens, in order
-1. **Welcome (night):** arched-window illustration, "Night 4 of 9 · Royal blue", "Your Dandiya night / *starts here.*", three promises (number private · North Campus, 18+ · block or report), "See who's going", "Already have a pass? Log in".
+1. **Welcome (night):** outline heart, "Night 5 of 9 · Yellow", **"Find your / *Dandiya partner.*"**, one line, "See who's going", "Already have a pass? Log in".
 2. **Name** → 3. **Gender** (Girl / Guy, tap moves on). Above every sign-up card: blurred faces and "184 guys from North Campus are going" (or "North Campus is going to garba" when counts are off or low).
 4. **Guest peek (day):** tonight's top 5 of the other side, clear photos, SAMPLE tag on samples, picks held on the phone, "Make my pass to see everyone". After the 5th: "That's tonight's top five. *Everyone else is inside.*"
-5. **WhatsApp number** ("3 picks saved" at the top right) → 6. **Code** (fills itself; resend after 30 s) → Picapool check (card only when found).
+5. **WhatsApp number** ("3 picks saved" at the top right) → 6. **Code** ("Sent on WhatsApp / by SMS to…", fills itself; after 30 s "Resend code" and "Send by SMS instead") → Picapool check (only when `PICAPOOL_LOOKUP` is on).
 7. **Birthday** (DD MM YYYY, shows the age, "I'm 18 or older, continue"; under 18 → "Dandiya Nights is 18+ only" page).
 8. **College** (search + tap; "Other college" + type it). Saves the account.
-9. **Nights** (+ "Every night", optional "Where, mostly?"), Terms/Privacy line, "Agree and see who's going". Makes the pass and sends the held picks.
-10. **Reveal (night):** "26 girls are going *on your nights.*" If a held pick already picked them back: "Kavya picked you too, so you're already paired" → "Say hi to Kavya".
-11. **Discover:** My nights / All nights, add-photo bar, crown bar, card (photos, college, nights with shared ones highlighted, where, line, ⋯ report), skip / pair up bar. Arrival → photo sheet; first swipe → photo sheet again if skipped. Fifth swipe → "add a line" sheet (once). 40 picks → daily limit sheet. End of deck → **Review skipped profiles**, invite, all nights.
-12. **Paired (night overlay):** "You and Kavya *are paired.*" → Say hi / Swap numbers / Keep exploring.
+9. **Where are you going for garba?** Suggested events (multiple choice) + "Add an event"; for each event, the day(s) and the time; Terms/Privacy line, "Agree and see who's going". Makes the pass and sends the held picks.
+10. **Reveal (night):** "26 girls are going *to garba this Navratri.*" If a held pick already picked them back: "Kavya picked you too, so you're already paired" → "Swap numbers with Kavya".
+11. **Discover:** add-photo bar, crown bar, card (photos, college, events with day and time, the ones you share highlighted, line, ⋯ report), skip / pair up bar. Same event + same day first. Arrival → photo sheet; first swipe → photo sheet again if skipped. Fifth swipe → "add a line" sheet (once). 40 picks → daily limit sheet. End of deck → **Review skipped profiles**, invite.
+12. **Paired (night overlay):** "You and Kavya *are paired.* You're both going to Hansraj Garba on Saturday." → Swap numbers / Keep exploring (Say hi too, with chat on).
 13. **Pairs:** Paired · Picked you · You picked (§9).
 14. **Board (live):** Garba Queen / Garba King, tonight / all of Navratri, podium + list of up to 20 a side, ▲/▼ for who moved, "Live · updated 9:41 pm", "You're #3 · 4 people picked you today. Only you see this", Flaunt your crown.
-15. **Profile ("Your pass"):** photo, name, college, nights, where; Share my Dandiya pass; Photos (up to 5, make main), Nights and where, College, Your line; In the race; **Pause my pass**; Delete; Log out.
+15. **Profile ("Your pass"):** photo, name, college, events; Share my Dandiya pass; Photos (up to 5, make main), Where you're going, College, Your line; In the race; **Pause my pass**; Delete; Log out.
+Laptops (1100 px and wider): tonight's Garba Queen and Garba King, top 5 each, beside the app.
 
 ## 7. API (JSON; errors are `{message, code?}` written for the user)
 | Method, path | Auth | Purpose |
 |---|---|---|
-| `GET /api/preview?gender=female\|male&nights=d5,d6` | public | **Changed.** Guest peek and sign-up crowd: tonight's top 5 (board order, then a daily shuffle), then samples. `{profiles: [{id, name, college, nights, prompt, photo, sample?}], count}`. Never phones or venues. `count` = real visible people on those nights, or `null` (§3). Cached 2 min |
+| `GET /api/preview?gender=female\|male` | public | Guest peek and sign-up crowd: tonight's top 5 (board order, then a daily shuffle), then samples. `{profiles: [{id, name, college, dates, prompt, photo, sample?}], count}`. Never phones or event names. `count` = real visible people of that side, or `null` (§3). Cached 2 min |
 | `GET /api/leaderboard?board=queen\|king&period=tonight\|week` | optional | **Changed.** Up to 20 per board: picked people first, then the rest of the race. Name, college, photo. With a token adds `me: {count, rank}` (private; `rank` only if picked) |
-| `POST /api/auth/otp` `{phone}` · `POST /api/auth/verify` `{phone, code, ref, entry, sessionId}` | public | Codes: 30 s cooldown, 5/hour per phone, 40/hour per network, 5 tries, 10 min expiry → `{token, user, profile}`. Tokens last 30 days |
+| `POST /api/auth/otp` `{phone, channel?}` · `POST /api/auth/verify` `{phone, code, ref, entry, sessionId}` | public | **Changed.** `channel: 'sms'` = "Send by SMS instead". → `{ok, via: 'whatsapp'\|'sms', alt}` (`alt` = the other way available, or null). Codes: 30 s cooldown, 5/hour per phone, 40/hour per network, 5 tries, 10 min expiry → `{token, user, profile}`. Tokens last 30 days |
 | `POST /api/auth/logout` | token | **New.** Ends this session on the server |
 | `POST /api/picapool/lookup` | token | → `{status: 'found'\|'not_found'\|'unavailable', user, synced?}` |
 | `POST /api/integrations/picapool-user` | `X-Picapool-Secret` | Picapool's push (§4b) |
 | `POST /api/account` `{firstName, gender, college, adult:true}` | token | Creates/updates the account (also used to edit the college). Picapool's name and gender win once linked |
 | `POST /api/age-block` | token | Under-18: deletes the account, keeps only a count |
-| `PUT /api/profile` | token | **Changed.** The pass: `photos` (0 to 5; base64 JPG/PNG or your existing photo URLs, first = main), `nights` (required), `venue`, `prompt {id, text}`, `inBoard`, `paused` (kept if not sent). Strips phones/handles from the line |
+| `POST /api/photos {photo}` | token | **New.** One photo (base64 JPG/PNG/WebP, ≤ 1.5 MB) → `{url}`. The page uploads each photo as it's picked, then saves the URLs in the pass. 60 per hour |
+| `PUT /api/profile` | token | **Changed.** The pass: `photos` (0 to 5; URLs from `/api/photos` or base64, first = main), `plans` (required, 1 to 5: `[{name, dates: ['2026-10-17'], time: '20:00'}]`, dates within Navratri, same name twice counts once), `prompt {id, text}`, `inBoard`, `paused` (kept if not sent). Strips phones/handles/links from the line and event names |
+| `GET /api/events/popular` | token | **New.** Event names 2+ people chose, most popular first (the suggestions on the events screen) |
 | `POST /api/profile/pause {paused}` | token | **New.** Pause / resume |
-| `GET /api/feed?all=0\|1` · `?passed=1` | token | Up to 60 visible passes, same night + venue first · people I skipped |
+| `GET /api/feed` · `?passed=1` | token | **Changed.** Up to 100 visible passes: same event on the same day first, then same event or same day, then everyone · people I skipped |
 | `POST /api/swipe` `{targetId, dir}` | token | 40 picks per IST day. Returns `match` when mutual. 404 for hidden, paused or photo-less passes |
 | `GET /api/matches` | token | Pairs, with chat and number states |
 | `GET /api/likes/received` · `POST /api/likes/dismiss {targetId}` · `GET /api/likes/sent` | token | Picked you · Not for me · You picked |
@@ -233,8 +276,10 @@ Don't change `MODE` (`'live'`) or `API_BASE` (`'/api'`).
 | `POST /api/report {targetId, reason}` · `POST /api/block` | token | Report also blocks; 3 reports hide the pass |
 | `DELETE /api/profile` | token | Deletes pass, photos, picks, pairs. Account stays |
 | `POST /api/events` | public | Analytics (§11) |
-| `GET /api/stats` | `X-Admin-Key` | **Changed: admin only.** Counts by night and college |
+| `GET /api/stats` | `X-Admin-Key` | Admin only. Counts by date, top events, top colleges |
+| `GET /api/admin/export.csv` | `X-Admin-Key` | **New.** Every signup: phone, name, gender, college, ref, signed up (IST), pass, photos, events, Picapool id |
 | `/api/admin/summary · top · reports · hide · conflicts` | `X-Admin-Key` | Used by `/admin` |
+| `GET /api/health` | public | `{ok, day, storage, otp: ['whatsapp','sms']}`: is the disk writable, which code senders are set |
 
 ## 8. Crowns and sharing
 - New passes are in the Garba Queen/King race automatically (Profile switch to leave). Top 20 per side, tonight and all of Navratri; no public counts. A pass needs a photo to be crowned.
@@ -243,24 +288,26 @@ Don't change `MODE` (`'live'`) or `API_BASE` (`'/api'`).
 - The invite sheet (Discover ⤴, end of the deck) leads with the **invite link** (`?ref=st-…`, attributed in `/admin`): Share / Copy invite link, WhatsApp, then "Post my pass to my story".
 
 ## 9. Pairs: three tabs, and every chat state
-**Paired** (default) · **Picked you** (they picked me; Pair up / Not for me; "You skipped them earlier") · **You picked** (waiting). ⋯ on every row: report or block. A line on Paired: 🔒 "Your number stays private on Picapool chat."
+**Paired** (default) · **Picked you** (they picked me; Pair up / Not for me; "You skipped them earlier") · **You picked** (waiting). ⋯ on every row: report or block.
+**At launch chat is off** (`CHAT_ENABLED = false`): every pair row has **Swap numbers** (numbers show only when both say yes). The chat states below come back when chat is turned on.
 
 | Situation | What the person sees |
 |---|---|
 | I'm not on Picapool | "One small step *before you chat*": Get Picapool, "I've signed up" (checks for real), "Swap numbers instead" |
-| Both on Picapool | "Say hi to Aditya": first message using only shared nights, optional **garba plan** (night, place, time, public meeting point) → "Your chat with Aditya *is ready*" → Open Picapool |
+| Both on Picapool | "Say hi to Aditya": first message using the event and day you share, optional **garba plan** (day, event, time, public meeting point) → "Your chat with Aditya *is ready*" → Open Picapool |
 | They aren't on Picapool | Same message → "Send message" → "Nikhil is reviewing *your message request*" (row says so too). Becomes a chat the moment they join (§4b) |
 | They wrote to me first | Row: "Sent you a message request" + "Read message" |
 | Swap numbers | "Swap numbers *with Rohan?* Totally your call…", "Share my number", "Chat on Picapool instead". Numbers show only when both say yes, with "Message on WhatsApp" |
 
 ## 10. Admin and the nightly routine (`/admin`, key = `ADMIN_KEY`)
+- **Download signups (CSV)** every night and import into Picapool (until account creation is connected). **Events people are going to** shows what's popular.
 - **Numbers:** accounts (total, today), passes, **passes without a photo (hidden)**, **paused**, girls/guys, pair-up picks, pairs, chats, numbers shared, reports, under-18 blocked, message requests waiting, Picapool clashes, signups per `ref`.
 - **Before posting each night's Garba Queen/King:** Top 20 → check every photo and name → **Hide** anything wrong (hidden people leave the board, the feeds and the guest peek).
 - **Reports:** hide, or unhide (clears reports). **Picapool clashes:** §4b.
 
 ## 11. Analytics (what's tracked)
 Every event goes to `POST /api/events` (live only) and lands in the `events` table with `ts, event, user_id, session_id, ref, data`. Funnel in order:
-`landing_view → cta_start → peek_start → peek_swipe{dir} → peek_gate{reason} → peek_to_signup{likes, seen} → otp_sent → otp_verified{existing} → picapool_lookup{status} → account_created → profile_done{nights, fromPeek} → pending_likes_sent{sent} → swipe{dir} → photo_prompt → photos_done{count, first}`
+`landing_view → cta_start → peek_start → peek_swipe{dir} → peek_gate{reason} → peek_to_signup{likes, seen} → otp_sent{via} → otp_verified{existing} → account_created → plan_add → profile_done{events, fromPeek} → pending_likes_sent{sent} → swipe{dir} → photo_prompt → photos_done{count, first}` (`otp_resent{via}` when a code is sent again)
 | Area | Events |
 |---|---|
 | Discover | `swipe{dir, review}`, `review_passed`, `match{from: feed\|review\|peek\|likes_you}`, `line_prompt`, `line_prompt_yes`, `daily_limit` |
@@ -275,9 +322,9 @@ SELECT ref, SUM(event='peek_start') peeks, SUM(event='profile_done') passes, SUM
 ```
 
 ## 12. Data and privacy
-- **Stored:** phone, first name, gender, college, ref, Picapool id; pass (photos, nights, where, line, race, paused); picks; pairs and message requests; reports; events.
+- **Stored:** phone, first name, gender, college, ref, Picapool id; pass (photos, events with days and time, line, race, paused); picks; pairs and message requests; reports; analytics events.
 - **Never stored:** date of birth (checked on the phone; only `adult: true` is sent; the boxes are cleared the moment it's used). Under-18 attempts are deleted and only counted.
-- **Shown to others:** first name, college, photos and pass to signed-in people. **Guests now see the top 5's main photo** (clear), first name, college, nights and line. Board: name, college, main photo, never counts. Numbers only after both agree. Plans share a place and time, never a live location.
+- **Shown to others:** first name, college, photos and pass (including events, days and times) to signed-in people. **Guests see the top 5's main photo** (clear), first name, college, the days they're going (never where) and line. Board: name, college, main photo, never counts. Numbers only after both agree. Plans share a place and time, never a live location.
 - **Counts:** only totals of people going (see §3), never per person.
 - **Auto-delete on 20 Oct:** everything Dandiya; accounts and Picapool links stay.
 - Terms and Privacy links sit next to "Agree and see who's going". Whoever owns Picapool's privacy policy should check it against the DPDP Act, especially the clear guest photos.
@@ -286,12 +333,11 @@ SELECT ref, SUM(event='peek_start') peeks, SUM(event='profile_done') passes, SUM
 On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 - [ ] `dandiya.picapool.tech/test?new=1` → welcome fills the screen; "See who's going"
 - [ ] Name → gender (tap moves on) → crowd line shows (with or without a number) → **tonight's top 5** with clear photos; samples tagged SAMPLE until there are 5 real people. After the 5th: "Everyone else is inside"; reload shows no more
-- [ ] Number → code (the first box takes a pasted or auto-filled code; it checks itself) → birthday shows the age → college tap → nights → **reveal** with the count → Discover. "Your picks were sent", or the "already paired" path
-- [ ] Discover shows "Add a photo"; first swipe opens the photo sheet; add several photos at once, make main, Save → "Your pass is live"; the prompt disappears; the pass now appears for the other side
-- [ ] **Sync:** stop at the birthday screen, create a Picapool account with the same number, come back → name/gender from Picapool. Rename yourself in the app → the pass shows the new name within a minute
-- [ ] Two real accounts pick each other → both see the pair (second within 45 s). One picks first → the other sees them in **Picked you** → Pair up → paired
-- [ ] Say hi with a plan → the message in the Picapool chat ends with "Plan: Thu 15 Oct, College garba, 8:00 pm. Meet at the main entrance."
-- [ ] Not on Picapool → "One small step…" → sign up → "I've signed up" finds you. Other not on Picapool → "…is reviewing your message request" → they get the WhatsApp → they sign up → the chat appears for both
+- [ ] Number → the code arrives **on WhatsApp** (the first box takes a pasted or auto-filled code; it checks itself). Wait 30 s → **Send by SMS instead** → the SMS arrives
+- [ ] Birthday shows the age → college tap → **Where are you going**: pick a suggested event, add your own, pick days and a time for each → **reveal** with the count → Discover. "Your picks were sent", or the "already paired" path
+- [ ] Swipes on a phone: drag right, drag left, a quick flick, a diagonal swipe, a small drag (snaps back), fast taps on the buttons. Every one moves to the next person exactly once
+- [ ] Discover shows "Add a photo"; add several photos at once (each shows as it uploads), make main, Save → "Your pass is live"; the prompt disappears; on the other phone the pass appears **with the photo**
+- [ ] Two real accounts pick each other → both see the pair (second within 45 s) and the second person **gets the WhatsApp "new pair" message**. One picks first → the other sees them in **Picked you** → Pair up → paired
 - [ ] Swap numbers → numbers only after both agree
 - [ ] ⋯ → report → the person is gone from Discover and Pairs. Pause → gone from the other side's Discover; resume → back
 - [ ] 40 picks → daily limit sheet. Invite link first in the invite sheet; `?ref=` attributed in `/admin`
@@ -324,8 +370,8 @@ On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 | Dev shortcuts | Fixed code and default admin key only with `NODE_ENV=development`/`test`; `integrations.js` never fakes a send otherwise |
 | Rate limits | Per session when signed in (900 / 5 min), per IP when not (1,500 / 5 min). Real IP = last `X-Forwarded-For` entry with `TRUST_PROXY=1` |
 | Admin & webhook | `X-Admin-Key` header only, constant-time compare; webhook secret constant-time; `/api/stats` admin-only |
-| Uploads | Max 1.5 MB per photo, 5 photos; type from the file's own bytes (JPEG/PNG/WebP only); random file names; served with a sandbox CSP and `nosniff` |
-| Text | Names letters-only; free text stripped of control characters, `<` `>`, phone numbers, @handles and links (line, first message, "Where") |
+| Uploads | One photo per request, max 1.5 MB, 60 per hour per person, 5 in a pass; type from the file's own bytes (JPEG/PNG/WebP only); random file names; only your own uploads can go in your pass; unused uploads removed after an hour; served with a sandbox CSP and `nosniff` |
+| Text | Names letters-only; free text stripped of control characters, `<` `>`, phone numbers, @handles and links (line, first message, event names) |
 | Browser | CSP (scripts and connections only to this server; images from this server, Unsplash, data/blob), no framing, `nosniff`, strict referrer, permissions off, HSTS in production. No CORS unless `CORS_ORIGIN` is set |
 | Privacy | Phones never leave the server except to the other person after both agree. Date of birth never sent. Under-18 attempts deleted |
 | Performance | Indexes on pairs (both sides), reports, sessions, the board; board and guest peek cached 15 s / 2 min; open boards refresh every 15 s, pairs every 45 s, both paused when the page is hidden; connections time out after 30 s |
@@ -341,4 +387,5 @@ On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 | v2 | Gaps filled: report/block on every card and pair, pause, "Where, mostly?", garba plan in Say hi, WhatsApp-alert line on the reveal, daily limit sheet, look at people you skipped, crown poster kept, log in goes straight to Discover | Deepanshu, 14 Oct |
 | v2.1 | Team feedback round 1: code-screen scroll fix, story sharing restored, live boards with 15+ a side, photo upload prompted, line prompt after 5 swipes, review skipped profiles. Design changes for screens 2–4 and Krish's cosmetic changes still to come | Team, 15 Oct |
 | v2.1 | Security and performance pass: see §17 | 15 Oct |
+| v3 | Team feedback round 2: landing headline "Find your Dandiya partner.", no icon rows, outline heart instead of the dandiya art; swiping fixed; "Which nights" removed; events typed by people (multiple, each with days and time) instead of fixed venues; 4-digit codes kept; WhatsApp + MSG91 codes and pair alerts; chat and the Picapool check off until Picapool's backend is connected; real store/Terms/Privacy links; hosting on our own server | Deepanshu, 15 Oct |
 | v2 | **Counts on** (sign-up crowd and reveal), behind `SHOW_COUNTS` and `COUNT_MIN`. Overrides build k's "no counts" rule; **Purav to confirm** | Deepanshu, 14 Oct; Purav to confirm |

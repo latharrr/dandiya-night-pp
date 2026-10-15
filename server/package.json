@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "NODE_ENV=production node server.js",
+    "start:env": "node --env-file=.env server.js",
     "dev": "NODE_ENV=development DEV_OTP=1234 node server.js",
     "seed:test": "node seed.js 20",
     "seed:remove": "node seed.js --remove",
