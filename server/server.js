@@ -35,6 +35,7 @@ const C = {
   REPORT_HIDE: +(ENV.REPORT_HIDE || 3),
   LB_REFRESH_MS: +(ENV.LB_REFRESH_MS ?? 15e3), // leaderboard is recomputed at most every 15 s; the page refreshes an open board every 15 s
   STATS_REFRESH_MS: +(ENV.STATS_REFRESH_MS || 5 * 60e3),
+  PREVIEW_CACHE_MS: +(ENV.PREVIEW_CACHE_MS ?? 120e3), // the guest peek is recomputed at most this often
   TRUST_PROXY: ENV.TRUST_PROXY === '1',
   DEV_OTP: DEV_MODE ? (ENV.DEV_OTP || null) : null,
   SESSION_DAYS: +(ENV.SESSION_DAYS || 30),       // a login lasts this long, then the code is asked again
@@ -42,6 +43,7 @@ const C = {
   VERIFY_PER_IP_HOUR: +(ENV.VERIFY_PER_IP_HOUR || 120),
   PICAPOOL_WEBHOOK_SECRET: ENV.PICAPOOL_WEBHOOK_SECRET || '', // shared secret for Picapool's backend to push account changes (§4b of HANDOFF)
   MAX_PHOTOS: 5,        // keep equal to CONFIG.MAX_PHOTOS in the page
+  MAX_PLANS: 5,         // events one person can add (name + dates + time); keep equal to CONFIG.MAX_PLANS
   BOARD_SIZE: 20,       // top N per board (Garba Queen / Garba King); keep equal to CONFIG.BOARD_SIZE
   PREVIEW_MAX: 5,       // guests peek at no more than this many people per request (the page also caps them at 5 in total)
   SAMPLE_PROFILES: ENV.SAMPLE_PROFILES !== '0', // fill the guest peek with labelled sample people (samples.json) while there are fewer than 5 real ones
@@ -55,9 +57,9 @@ if (!PROD && !DEV_MODE) console.warn('[warn] NODE_ENV is not set. Running with p
 if (C.ADMIN_KEY && C.ADMIN_KEY.length < 16 && !DEV_MODE) console.warn('[warn] ADMIN_KEY is short. Use a long random value.');
 /* constant-time comparison for secrets (admin key, webhook secret, code hashes) */
 const same = (a, b) => { const x = Buffer.from(String(a ?? '')), y = Buffer.from(String(b ?? '')); return x.length === y.length && crypto.timingSafeEqual(x, y); };
-const NIGHTS = ['d1','d2','d3','d4','d5','d6','d7','d8','d9'];
-// Navratri 2026 (keep equal to CONFIG.NIGHTS in the page). Used to keep sample people on nights that haven't passed.
-const NIGHT_DATES = NIGHTS.map((id, i) => [id, `2026-10-${String(11 + i).padStart(2, '0')}`]);
+// Navratri 2026, 11–19 Oct (keep equal to CONFIG.NIGHTS in the page). The dates someone can say they're going to an event.
+const DATES = Array.from({length: 9}, (_, i) => `2026-10-${String(11 + i).padStart(2, '0')}`);
+const TIME_OK = /^([01]\d|2[0-3]):[0-5]\d$/;
 const ENUMS = {
   gender: ['female','male'], lookingFor: ['one','every'], skill: ['learning','hold','main'], style: ['garba','dandiya','both'],
   sticks: ['have','spare','need'], outfit: ['night','own','match'], knuckle: ['tap','click','breaker'], ride: ['own','cab','metro','need'],
@@ -65,7 +67,11 @@ const ENUMS = {
 };
 const SKILL_LEVEL = {learning: 0, hold: 1, main: 2};
 const PHOTO_DIR = path.join(C.DATA_DIR, 'photos');
+/* Photos and the database live in DATA_DIR, so it must be a real, persistent disk. Serverless hosts (Vercel, Netlify) wipe it. */
+if (ENV.VERCEL || ENV.NETLIFY || ENV.AWS_LAMBDA_FUNCTION_NAME) { console.error('This server needs a persistent disk for photos and the database. Run it on a VPS / Docker with a volume, not on serverless functions (HANDOFF §3).'); process.exit(1); }
 fs.mkdirSync(PHOTO_DIR, {recursive: true});
+const storageOk = () => { try { const f = path.join(PHOTO_DIR, '.write-test'); fs.writeFileSync(f, 'ok'); fs.rmSync(f); return true; } catch (e) { return false; } };
+if (!storageOk()) { console.error(`Can't write to ${PHOTO_DIR}. Set DATA_DIR to a folder this process can write to.`); process.exit(1); }
 
 /* ---------------- db ---------------- */
 const db = new DatabaseSync(path.join(C.DATA_DIR, 'dandiya.db'));
@@ -118,11 +124,31 @@ const clean = (s, max) => String(s ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' 
 // strip contact details from free text: long digit runs, @handles, links
 const noContacts = s => s.replace(/(\+?\d[\d\s-]{5,}\d)/g, '').replace(/@\w+/g, '').replace(/https?:\/\/\S+|www\.\S+|\b\S+\.(com|in|me|io|link)\b/gi, '').replace(/\s+/g, ' ').trim();
 const photoUrl = name => `${C.PUBLIC_URL}/photos/${name}`;
+/* Where someone is going: up to MAX_PLANS events, each {name, dates: ['2026-10-16', …], time: '20:00'}.
+   The event name is typed by the person (or picked from what others typed). Matching compares names loosely (case, spaces, punctuation). */
+const eventKey = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+function cleanPlans(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [], seen = new Set();
+  for (const x of list.slice(0, C.MAX_PLANS * 2)) {
+    const name = noContacts(clean(x?.name, 40));
+    if (name.length < 2) bad('Type the name of the event.');
+    const k = eventKey(name); if (!k || seen.has(k)) continue; seen.add(k);
+    const dates = [...new Set(Array.isArray(x.dates) ? x.dates : [])].filter(d => DATES.includes(d)).sort();
+    if (!dates.length) bad(`Pick the date for ${name}.`);
+    if (!TIME_OK.test(String(x.time || ''))) bad(`Pick a time for ${name}.`);
+    out.push({name, dates, time: x.time});
+  }
+  if (out.length > C.MAX_PLANS) bad(`Up to ${C.MAX_PLANS} events.`);
+  return out;
+}
+const plansOf = p => Array.isArray(p?.plans) ? p.plans : [];
+const datesOf = p => [...new Set(plansOf(p).flatMap(x => x.dates))].sort();
 
 function userJson(u) { return u ? {id: u.id, firstName: u.first_name || '', gender: u.gender || null, college: u.college || '', adult: !!u.adult, hasPicapool: !!u.picapool_id} : null; }
 function profileOf(userId) { const r = q('SELECT data FROM profiles WHERE user_id=?').get(userId); return r ? JSON.parse(r.data) : null; }
 function card(u, p) {
-  return {id: u.id, name: u.first_name, college: u.college, photos: p.photos, nights: p.nights, venue: p.venue, lookingFor: p.lookingFor, skill: p.skill,
+  return {id: u.id, name: u.first_name, college: u.college, photos: p.photos, plans: plansOf(p), lookingFor: p.lookingFor, skill: p.skill,
     style: p.style, sticks: p.sticks, outfit: p.outfit, knuckle: p.knuckle, prompt: p.prompt || null, ride: p.ride, seats: p.seats || 0};
 }
 const blockedPair = (a, b) => !!q('SELECT 1 FROM blocks WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?)').get(a, b, b, a);
@@ -171,50 +197,49 @@ const needProfile = u => { needComplete(u); const p = profileOf(u.id); if (!p) b
 
 /* ---------------- caches ---------------- */
 let lbCache = {}, statsCache = null;
-const bustCaches = () => { lbCache = {}; statsCache = null; if (typeof previewCache !== 'undefined') previewCache = {}; };
+const bustCaches = () => { lbCache = {}; statsCache = null; previewCache = {}; popCache = null; };
 
 /* ---------------- routes ---------------- */
 const routes = [];
 const route = (method, pattern, handler, opts = {}) => routes.push({method, re: new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), handler, limit: opts.limit || 64e3});
 
-route('GET', '/api/health', () => ({ok: true, day: istDay()}));
+route('GET', '/api/health', () => ({ok: true, day: istDay(), storage: storageOk(), otp: integrations.otpChannels()}));
 
 route('GET', '/api/stats', ({req, url}) => {
-  admin(req, url); // counts by college and night: for the team, not the public
+  admin(req, url); // counts by college, date and event: for the team, not the public
   if (statsCache && now() - statsCache.at < C.STATS_REFRESH_MS) return statsCache.body;
   const rows = q(`SELECT u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')}`).all();
-  const byNight = {}, cc = {};
-  for (const r of rows) { const d = JSON.parse(r.data); for (const n of d.nights) byNight[n] = (byNight[n] || 0) + 1; cc[r.college] = (cc[r.college] || 0) + 1; }
+  const byDate = {}, cc = {};
+  for (const r of rows) { const d = JSON.parse(r.data); for (const x of datesOf(d)) byDate[x] = (byDate[x] || 0) + 1; cc[r.college] = (cc[r.college] || 0) + 1; }
   const topColleges = Object.entries(cc).filter(([n]) => n && n !== 'Not in college' && n !== 'Other DU college').sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, count]) => ({name, count}));
-  const body = {total: rows.length, byNight, topColleges};
+  const body = {total: rows.length, byDate, topEvents: popularEvents(10, 1), topColleges};
   statsCache = {at: now(), body};
   return body;
 });
 
 /* Guests peek before signing up: the day's top PREVIEW_MAX people of the other side, in Garba Queen/King order
    (tonight's board first, then the all-Navratri board, then everyone else in a daily shuffle).
-   First name, college, nights, line and the main photo. Never phones, venues or hidden, paused or photo-less people.
+   First name, college, the dates they're going, line and the main photo. Never phones, event names or hidden, paused or photo-less people.
    While there are fewer than PREVIEW_MAX real people, labelled sample people (samples.json) fill the gap: real people always come first.
-   `count` is how many real people of that side (on those nights, if given) have a visible card; null below COUNT_MIN or with SHOW_COUNTS=0. */
+   `count` is how many real people of that side have a visible card; null below COUNT_MIN or with SHOW_COUNTS=0. */
 let previewCache = {};
 const SAMPLES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'samples.json'), 'utf8')); } catch (e) { return {female: [], male: []}; } })();
 route('GET', '/api/preview', ({url}) => {
   const gender = url.searchParams.get('gender') === 'male' ? 'male' : 'female';
-  const nights = String(url.searchParams.get('nights') || '').split(',').filter(n => NIGHTS.includes(n)).slice(0, 9);
-  const key = gender + ':' + nights.sort().join(',') + ':' + istDay();
-  const c = previewCache[key]; if (c && now() - c.at < 120e3) return c.body;
+  const key = gender + ':' + istDay();
+  const c = previewCache[key]; if (c && now() - c.at < C.PREVIEW_CACHE_MS) return c.body;
   const rows = q(`SELECT u.id, u.first_name, u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1 AND u.gender=?`).all(gender);
-  const eligible = rows.map(r => ({r, p: JSON.parse(r.data)})).filter(({p}) => !nights.length || p.nights.some(n => nights.includes(n)));
+  const eligible = rows.map(r => ({r, p: JSON.parse(r.data)}));
   const order = [...rankBoard(gender, 'tonight'), ...rankBoard(gender, 'week')].map(x => x.id);
   const pos = id => { const i = order.indexOf(id); return i < 0 ? Infinity : i; };
   const rest = shuffle(eligible.filter(({r}) => pos(r.id) === Infinity), key);
   let list = [...eligible.filter(({r}) => pos(r.id) < Infinity).sort((a, b) => pos(a.r.id) - pos(b.r.id)), ...rest];
-  list = list.slice(0, C.PREVIEW_MAX).map(({r, p}) => ({id: r.id, name: r.first_name, college: r.college, nights: p.nights, prompt: p.prompt || null, photo: p.photos[0]}));
+  list = list.slice(0, C.PREVIEW_MAX).map(({r, p}) => ({id: r.id, name: r.first_name, college: r.college, dates: datesOf(p), prompt: p.prompt || null, photo: p.photos[0]}));
   if (C.SAMPLE_PROFILES && list.length < C.PREVIEW_MAX) {
-    const today = istDay(), upcoming = NIGHT_DATES.filter(([, d]) => d >= today).map(([id]) => id);
+    const today = istDay(), upcoming = DATES.filter(d => d >= today);
     const fill = (SAMPLES[gender] || []).slice(0, C.PREVIEW_MAX - list.length).map((x, i) => {
-      const ns = (x.nights || []).filter(n => upcoming.includes(n));
-      return {id: `sample-${gender[0]}${i + 1}`, name: x.name, college: x.college, nights: ns.length ? ns : upcoming.slice(0, 2), prompt: x.line ? {id: 'flag', text: x.line} : null, photo: x.photo, sample: true};
+      const ds = upcoming.filter((_, k) => (k + i) % 2 === 0).slice(0, 2);
+      return {id: `sample-${gender[0]}${i + 1}`, name: x.name, college: x.college, dates: ds.length ? ds : upcoming.slice(0, 1), prompt: x.line ? {id: 'flag', text: x.line} : null, photo: x.photo, sample: true};
     });
     list = [...list, ...fill];
   }
@@ -234,11 +259,13 @@ route('POST', '/api/auth/otp', async ({req, body}) => {
   if (t - windowStart > 3600e3) { windowStart = t; count = 0; }
   if (count >= 5) bad('Too many codes. Try again in an hour.', 429);
   const code = C.DEV_OTP || String(crypto.randomInt(0, 10 ** C.OTP_LENGTH)).padStart(C.OTP_LENGTH, '0');
-  try { await integrations.sendOtp(phone, code); } catch (e) { console.error('[otp] send failed', e.message); bad("Couldn't send the code. Try again in a minute.", 502); }
+  const prefer = ['sms', 'whatsapp'].includes(body.channel) ? body.channel : null;
+  let via; try { via = await integrations.sendOtp(phone, code, prefer); } catch (e) { console.error('[otp] send failed', e.message); bad("Couldn't send the code. Try again in a minute.", 502); }
   q(`INSERT INTO otps(phone, code_hash, expires_at, attempts, last_sent, window_start, window_count) VALUES(?,?,?,?,?,?,?)
      ON CONFLICT(phone) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at, attempts=0, last_sent=excluded.last_sent, window_start=excluded.window_start, window_count=excluded.window_count`)
     .run(phone, sha(phone + ':' + code), t + C.OTP_TTL_MS, 0, t, windowStart, count + 1);
-  return {ok: true};
+  // `alt`: the other way the code can go, for a "Send by SMS instead" button
+  return {ok: true, via: via || 'whatsapp', alt: integrations.otpChannels().find(c => c !== via) || null};
 });
 
 route('POST', '/api/auth/verify', async ({req, body}) => {
@@ -359,11 +386,13 @@ route('POST', '/api/age-block', ({req}) => {
   return {ok: true};
 });
 
+/* A photo in a profile is either one already on this server (uploaded by this person, via POST /api/photos or an earlier save)
+   or a new data: URL. Returns the stored file name. */
 function savePhoto(userId, src, keep) {
   if (typeof src !== 'string') bad('Bad photo.');
-  const own = src.replace(C.PUBLIC_URL, '');
+  const own = C.PUBLIC_URL && src.startsWith(C.PUBLIC_URL) ? src.slice(C.PUBLIC_URL.length) : src;
   const m0 = /^\/photos\/([\w-]+\.(?:jpg|png|webp))$/.exec(own);
-  if (m0) { if (!m0[1].startsWith(userId + '-') || !keep.has(m0[1])) bad('Bad photo.'); return m0[1]; }
+  if (m0) { if (!m0[1].startsWith(userId + '-') || (!keep.has(m0[1]) && !fs.existsSync(path.join(PHOTO_DIR, m0[1])))) bad('That photo is gone. Add it again.'); return m0[1]; }
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(src);
   if (!m) bad('Photos must be JPG or PNG.');
   if (m[2].length > 2.1e6) bad('That photo is too big.');
@@ -379,14 +408,29 @@ function savePhoto(userId, src, keep) {
   return name;
 }
 function photoNames(p) { return (p?.photos || []).map(u => (u.split('/photos/')[1] || '')).filter(Boolean); }
+/* photos uploaded but never saved into a profile (closed the sheet, replaced them): removed after an hour */
+function sweepPhotos(userId, keepNames) {
+  const t = now();
+  for (const f of fs.readdirSync(PHOTO_DIR)) {
+    if (!f.startsWith(userId + '-') || keepNames.includes(f)) continue;
+    try { if (t - fs.statSync(path.join(PHOTO_DIR, f)).mtimeMs > 3600e3) fs.rmSync(path.join(PHOTO_DIR, f)); } catch (e) {}
+  }
+}
+/* One photo at a time, the moment it's picked: small requests (well under a proxy's 1 MB default) and nothing lost if the
+   connection drops halfway through five photos. The photo only becomes visible once it's in the saved profile. */
+route('POST', '/api/photos', ({req, body}) => {
+  const u = authUser(req); needComplete(u);
+  hit('photo:' + u.id, 3600e3, 60, 'Too many photos for now. Try again in a while.');
+  const name = savePhoto(u.id, body.photo, new Set());
+  return {url: photoUrl(name)};
+}, {limit: 2.5e6});
 
 route('PUT', '/api/profile', ({req, body}) => {
   const u = authUser(req); needComplete(u);
   const e = (k, v) => ENUMS[k].includes(v) ? v : bad('Please answer every question.');
   const opt = (k, v) => v === null || v === undefined || v === '' ? null : e(k, v); // filled in later from the Me tab
-  const nights = [...new Set(Array.isArray(body.nights) ? body.nights : [])].filter(n => NIGHTS.includes(n));
-  if (!nights.length) bad('Pick at least one night.');
-  const venue = noContacts(clean(body.venue, 40)) || null; if (venue === '__other') bad('Type where you are going.');
+  const plans = cleanPlans(body.plans);
+  if (!plans.length) bad('Add at least one event you’re going to.');
   let prompt = null;
   if (body.prompt && ENUMS.prompt.includes(body.prompt.id)) { const t = noContacts(clean(body.prompt.text, 60)); if (t.length >= 2) prompt = {id: body.prompt.id, text: t}; }
   const photosIn = Array.isArray(body.photos) ? body.photos : []; // a card may start without a photo; nobody sees it until it has one
@@ -396,7 +440,7 @@ route('PUT', '/api/profile', ({req, body}) => {
   const ride = opt('ride', body.ride);
   // tiny blurred-preview thumbnail (≤18×22 JPEG): the only image guests ever receive
   const thumb = typeof body.thumb === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]{20,3000}$/.test(body.thumb) ? body.thumb : (old?.thumb || null);
-  const p = {photos: names.map(photoUrl), thumb, nights, venue, lookingFor: opt('lookingFor', body.lookingFor), skill: opt('skill', body.skill), style: opt('style', body.style),
+  const p = {photos: names.map(photoUrl), thumb, plans, lookingFor: opt('lookingFor', body.lookingFor), skill: opt('skill', body.skill), style: opt('style', body.style),
     sticks: opt('sticks', body.sticks), outfit: opt('outfit', body.outfit), knuckle: opt('knuckle', body.knuckle), prompt, ride,
     seats: ride === 'own' ? Math.max(1, Math.min(3, +body.seats || 1)) : 0, rideConsent: !!body.rideConsent,
     // new cards are in the Garba Queen/King race unless they say otherwise; an existing card keeps its stored choice unless it is sent
@@ -406,15 +450,32 @@ route('PUT', '/api/profile', ({req, body}) => {
   q(`INSERT INTO profiles(user_id, data, in_board, hidden, created_at, updated_at) VALUES(?,?,?,0,?,?)
      ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, in_board=excluded.in_board, updated_at=excluded.updated_at`).run(u.id, JSON.stringify(p), p.inBoard ? 1 : 0, t, t);
   for (const n of keep) if (!names.includes(n)) fs.rm(path.join(PHOTO_DIR, n), () => {});
+  sweepPhotos(u.id, names);
   bustCaches();
   return {profile: p};
 }, {limit: 12e6});
+
+/* Event names other people are going to, most popular first, to pick from instead of typing.
+   Only names at least `min` people chose (so a one-off typo or a bad name never shows to everyone). */
+let popCache = null;
+function popularEvents(limit = 12, min = 2) {
+  if (min === 2 && popCache && now() - popCache.at < 60e3) return popCache.rows.slice(0, limit);
+  const by = new Map();
+  for (const r of q(`SELECT p.data FROM profiles p WHERE p.hidden=0`).all()) for (const x of plansOf(JSON.parse(r.data))) {
+    const k = eventKey(x.name), e = by.get(k) || {n: 0, names: {}}; e.n++; e.names[x.name] = (e.names[x.name] || 0) + 1; by.set(k, e);
+  }
+  const rows = [...by.values()].filter(e => e.n >= min).sort((a, b) => b.n - a.n)
+    .map(e => ({name: Object.entries(e.names).sort((a, b) => b[1] - a[1])[0][0], count: e.n}));
+  if (min === 2) popCache = {at: now(), rows};
+  return rows.slice(0, limit);
+}
+route('GET', '/api/events/popular', ({req}) => { authUser(req); return {events: popularEvents(12, 2).map(e => e.name)}; });
 
 function rightsUsedToday(uid) { return q(`SELECT COUNT(*) n FROM swipes WHERE from_id=? AND dir='right' AND day=?`).get(uid, istDay()).n; }
 
 route('GET', '/api/feed', ({req, url}) => {
   const u = authUser(req); const me = needProfile(u);
-  const all = url.searchParams.get('all') === '1', passed = url.searchParams.get('passed') === '1';
+  const passed = url.searchParams.get('passed') === '1';
   const t = now();
   const swiped = new Map(q('SELECT to_id, dir, at, retried FROM swipes WHERE from_id=?').all(u.id).map(r => [r.to_id, r]));
   const blocked = new Set(q('SELECT to_id x FROM blocks WHERE from_id=? UNION SELECT from_id x FROM blocks WHERE to_id=?').all(u.id, u.id).map(r => r.x));
@@ -425,14 +486,22 @@ route('GET', '/api/feed', ({req, url}) => {
     const s = swiped.get(r.id);
     if (passed) { if (!s || s.dir !== 'left') continue; }
     else if (s && !(s.dir === 'left' && !s.retried && t - s.at > 24 * 3600e3)) continue;
-    const p = JSON.parse(r.data);
-    if (!passed && !all && !p.nights.some(n => me.nights.includes(n))) continue;
-    list.push(card(r, p));
+    list.push(card(r, JSON.parse(r.data)));
   }
-  const tier = p => { const night = p.nights.some(n => me.nights.includes(n)); if (night && p.venue && p.venue === me.venue) return 0; if (night) return 1;
-    return Math.abs((SKILL_LEVEL[p.skill] ?? 1) - (SKILL_LEVEL[me.skill] ?? 1)) <= 1 ? 2 : 3; };
-  const tiers = [[], [], [], []]; list.forEach(p => tiers[tier(p)].push(p));
-  list = tiers.flatMap((x, i) => shuffle(x, u.id + ':' + istDay() + ':' + i)).slice(0, 60);
+  /* Everyone is in the feed; people going where and when you are come first:
+     0 same event on the same date · 1 same event, or same date · 2 everyone else */
+  const today = istDay(), mine = plansOf(me), myDates = new Set(datesOf(me).filter(d => d >= today)), myEv = new Map(mine.map(x => [eventKey(x.name), x.dates]));
+  const tier = p => {
+    let ev = false, day = false;
+    for (const x of p.plans) {
+      const ds = myEv.get(eventKey(x.name));
+      if (ds) { ev = true; if (x.dates.some(d => d >= today && ds.includes(d))) return 0; }
+      if (x.dates.some(d => myDates.has(d))) day = true;
+    }
+    return ev || day ? 1 : 2;
+  };
+  const tiers = [[], [], []]; list.forEach(p => tiers[tier(p)].push(p));
+  list = tiers.flatMap((x, i) => shuffle(x, u.id + ':' + today + ':' + i)).slice(0, 100);
   return {profiles: list, rightsLeftToday: Math.max(0, C.DAILY_RIGHT_CAP - rightsUsedToday(u.id))};
 });
 
@@ -673,6 +742,20 @@ route('GET', '/api/admin/summary', ({req, url}) => {
     messageRequestsWaiting: n('SELECT COUNT(*) n FROM matches WHERE req_by IS NOT NULL AND chat_id IS NULL'),
   };
 });
+/* Everyone who signed up, as CSV: to import into Picapool while account creation isn't wired (the main KPI). */
+route('GET', '/api/admin/export.csv', ({req, url, res}) => {
+  admin(req, url);
+  const rows = q(`SELECT u.*, p.data FROM users u LEFT JOIN profiles p ON p.user_id=u.id WHERE u.completed_at IS NOT NULL AND u.phone NOT LIKE '5%' ORDER BY u.completed_at`).all();
+  const cell = v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return `"${s.replace(/"/g, '""')}"`; }; // no spreadsheet formulas
+  const ist = t => t ? new Date(t + 330 * 60e3).toISOString().slice(0, 16).replace('T', ' ') : '';
+  const lines = ['phone,first_name,gender,college,ref,signed_up_ist,has_pass,photos,events,picapool_id'];
+  for (const r of rows) { const p = r.data ? JSON.parse(r.data) : null;
+    lines.push([r.phone, r.first_name, r.gender, r.college, r.ref, ist(r.completed_at), p ? 'yes' : 'no', p ? (p.photos || []).length : 0,
+      plansOf(p).map(x => `${x.name} (${x.dates.map(d => +d.slice(8)).join('/')} Oct ${x.time})`).join('; '), r.picapool_id].map(cell).join(',')); }
+  res.writeHead(200, {'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="dandiya-signups-${istDay()}.csv"`, 'Cache-Control': 'no-store'});
+  res.end('\ufeff' + lines.join('\n'));
+  return undefined;
+});
 /* people whose Picapool gender differs from their Dandiya card: the card keeps working; a person decides (HANDOFF §4b) */
 route('GET', '/api/admin/conflicts', ({req, url}) => {
   admin(req, url);
@@ -708,7 +791,7 @@ function purgeIfDue() {
   tx(() => {
     for (const r of q('SELECT user_id, data FROM profiles').all()) {
       const p = JSON.parse(r.data);
-      if (p.rideConsent) q('INSERT OR REPLACE INTO ride_intents(user_id, ride, seats, venue, saved_at) VALUES(?,?,?,?,?)').run(r.user_id, p.ride, p.seats || 0, p.venue, now());
+      if (p.rideConsent) q('INSERT OR REPLACE INTO ride_intents(user_id, ride, seats, venue, saved_at) VALUES(?,?,?,?,?)').run(r.user_id, p.ride, p.seats || 0, plansOf(p)[0]?.name || null, now());
     }
     for (const t of ['profiles', 'swipes', 'matches', 'blocks', 'reports', 'dismissed']) db.exec(`DELETE FROM ${t}`);
     q(`INSERT INTO meta(k, v) VALUES('purged', ?)`).run(new Date().toISOString());
@@ -760,6 +843,7 @@ const server = http.createServer(async (req, res) => {
       for (const k in params) params[k] = decodeURIComponent(params[k]);
       const body = ['POST', 'PUT'].includes(req.method) ? await readBody(req, r.limit) : {};
       const out = await r.handler({req, res, url, body, params});
+      if (out === undefined && res.headersSent) return; // the handler wrote the response itself (CSV export)
       return out === null ? (res.writeHead(204), res.end()) : send(res, 200, out);
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') bad('Not found.', 404);
