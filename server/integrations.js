@@ -62,6 +62,7 @@ async function sendSms(phone, code) {
 const fill = (v, to, other) => ({name: other.first_name, me: to.first_name, college: other.college, link: APP_URL}[v] ?? '');
 
 module.exports = {
+  waTemplate,
   /** Which ways a login code can go out right now: ['whatsapp', 'sms'] in the order they are tried. */
   otpChannels() { return CHANNELS.filter(ready); },
 

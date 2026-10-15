@@ -87,12 +87,16 @@ CREATE INDEX IF NOT EXISTS swipes_to ON swipes(to_id, dir, day);
 CREATE INDEX IF NOT EXISTS swipes_from_day ON swipes(from_id, dir, day);
 CREATE TABLE IF NOT EXISTS matches(id TEXT PRIMARY KEY, a TEXT, b TEXT, created_at INTEGER, chat_id TEXT, a_share INTEGER DEFAULT 0, b_share INTEGER DEFAULT 0, UNIQUE(a, b));
 CREATE TABLE IF NOT EXISTS blocks(from_id TEXT, to_id TEXT, PRIMARY KEY(from_id, to_id));
+CREATE TABLE IF NOT EXISTS photo_flags(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, photo TEXT, at TEXT, status TEXT DEFAULT 'pending', resolved_at TEXT);
+CREATE TABLE IF NOT EXISTS feedback(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, rating INTEGER, text TEXT, at TEXT);
 CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY AUTOINCREMENT, from_id TEXT, to_id TEXT, reason TEXT, at INTEGER, resolved INTEGER DEFAULT 0, UNIQUE(from_id, to_id));
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, event TEXT, user_id TEXT, session_id TEXT, ref TEXT, data TEXT);
 CREATE TABLE IF NOT EXISTS age_blocks(at INTEGER, ref TEXT);
 CREATE TABLE IF NOT EXISTS ride_intents(user_id TEXT PRIMARY KEY, ride TEXT, seats INTEGER, venue TEXT, saved_at INTEGER);
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE IF NOT EXISTS swipe_grants(user_id TEXT, day TEXT, extra INTEGER, by TEXT, at INTEGER);
 `);
+try { db.prepare('ALTER TABLE users ADD COLUMN feedback_done INTEGER DEFAULT 0').run(); } catch (e) {}
 // build j: a match can hold one pending message request (sender has Picapool, the other person doesn't yet)
 for (const col of ['req_by TEXT', 'req_opener TEXT', 'req_at INTEGER']) { try { db.exec(`ALTER TABLE matches ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
 // build k: identity sync with Picapool, and "Not for me" on likes you received
@@ -108,7 +112,7 @@ CREATE INDEX IF NOT EXISTS profiles_board ON profiles(in_board, hidden);`);
 const q = sql => db.prepare(sql);
 /* A card is visible to others when it isn't hidden by an admin, has at least one photo and isn't paused by its owner.
    v2: a card can exist without a photo (the photo is asked for after the first swipe); until then nobody sees it. */
-const VISIBLE = a => `${a}.hidden=0 AND json_array_length(${a}.data,'$.photos')>0 AND COALESCE(json_extract(${a}.data,'$.paused'),0)=0`;
+const VISIBLE = a => `${a}.hidden=0 AND json_array_length(${a}.data,'$.photos')>0 AND COALESCE(json_extract(${a}.data,'$.paused'),0)=0 AND ${a}.banned=0`;
 const visibleCard = p => !!p && (p.photos || []).length > 0 && !p.paused;
 const tx = fn => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
 
@@ -264,6 +268,8 @@ route('GET', '/api/preview', ({url}) => {
 route('POST', '/api/auth/otp', async ({req, body}) => {
   const phone = String(body.phone || '');
   if (!/^[6-9]\d{9}$/.test(phone)) bad('Enter your 10-digit WhatsApp number.');
+  const bp = q('SELECT p.banned FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.phone=?').get(phone);
+  if (bp && bp.banned) bad('This account is no longer active.', 403);
   hit('otp:' + clientIp(req), 3600e3, C.OTP_PER_IP_HOUR, 'Too many codes from this network. Try again in a while.');
   const t = now(), o = q('SELECT * FROM otps WHERE phone=?').get(phone);
   if (o && t - o.last_sent < 30e3) bad('Wait 30 seconds before asking for another code.', 429);
@@ -465,12 +471,13 @@ route('PUT', '/api/profile', ({req, body}) => {
   const e = (k, v) => ENUMS[k].includes(v) ? v : bad('Please answer every question.');
   const opt = (k, v) => v === null || v === undefined || v === '' ? null : e(k, v); // filled in later from the Me tab
   const plans = cleanPlans(body.plans);
-  if (!plans.length) bad('Add at least one event you’re going to.');
+  // events are optional: people with no garba plan yet can skip
   let prompt = null;
   if (body.prompt && ENUMS.prompt.includes(body.prompt.id)) { const t = noContacts(clean(body.prompt.text, 60)); if (t.length >= 2) prompt = {id: body.prompt.id, text: t}; }
   const photosIn = Array.isArray(body.photos) ? body.photos : []; // a card may start without a photo; nobody sees it until it has one
   if (photosIn.length > C.MAX_PHOTOS) bad(`Up to ${C.MAX_PHOTOS} photos.`);
   const old = profileOf(u.id), keep = new Set(photoNames(old));
+  if (photoNames(old).length === 0 && photosIn.length > 0) q('INSERT INTO photo_flags(user_id, photo, at) VALUES(?,?,?)').run(u.id, String(photosIn[0]).slice(0,200), now());
   const names = photosIn.map(src => savePhoto(u.id, src, keep));
   const ride = opt('ride', body.ride);
   // tiny blurred-preview thumbnail (≤18×22 JPEG): the only image guests ever receive
@@ -507,6 +514,8 @@ function popularEvents(limit = 12, min = 2) {
 route('GET', '/api/events/popular', ({req}) => { authUser(req); return {events: popularEvents(12, 2).map(e => e.name)}; });
 
 function rightsUsedToday(uid) { return q(`SELECT COUNT(*) n FROM swipes WHERE from_id=? AND dir='right' AND day=?`).get(uid, istDay()).n; }
+function grantsToday(uid) { return q('SELECT COALESCE(SUM(extra),0) g FROM swipe_grants WHERE user_id=? AND day=?').get(uid, istDay()).g; }
+function rightsLeftToday(uid) { return Math.max(0, C.DAILY_RIGHT_CAP + grantsToday(uid) - rightsUsedToday(uid)); }
 
 route('GET', '/api/feed', ({req, url}) => {
   const u = authUser(req); const me = needProfile(u);
@@ -537,7 +546,7 @@ route('GET', '/api/feed', ({req, url}) => {
   };
   const tiers = [[], [], []]; list.forEach(p => tiers[tier(p)].push(p));
   list = tiers.flatMap((x, i) => shuffle(x, u.id + ':' + today + ':' + i)).slice(0, 100);
-  return {profiles: list, rightsLeftToday: Math.max(0, C.DAILY_RIGHT_CAP - rightsUsedToday(u.id))};
+  return {profiles: list, rightsLeftToday: rightsLeftToday(u.id)};
 });
 
 function matchJson(m, meId) {
@@ -558,8 +567,8 @@ route('POST', '/api/swipe', async ({req, body}) => {
   if (!target || target.id === u.id || !mutual(u, target)) bad('That profile is no longer available.', 404);
   if (blockedPair(u.id, target.id)) bad('That profile is no longer available.', 404);
   const prev = q('SELECT * FROM swipes WHERE from_id=? AND to_id=?').get(u.id, target.id);
-  if (prev && prev.dir === 'right') return {match: null, rightsLeftToday: Math.max(0, C.DAILY_RIGHT_CAP - rightsUsedToday(u.id))};
-  if (dir === 'right' && rightsUsedToday(u.id) >= C.DAILY_RIGHT_CAP) bad(`That's today's ${C.DAILY_RIGHT_CAP} right swipes. Back tomorrow!`, 429);
+  if (prev && prev.dir === 'right') return {match: null, rightsLeftToday: rightsLeftToday(u.id)};
+  if (dir === 'right' && rightsLeftToday(u.id) <= 0) bad(`That's today's ${C.DAILY_RIGHT_CAP} right swipes. Back tomorrow!`, 429);
   const t = now(), day = istDay();
   let match = null, created = false;
   tx(() => {
@@ -572,8 +581,11 @@ route('POST', '/api/swipe', async ({req, body}) => {
       match = m;
     }
   });
-  if (created) integrations.notifyMatch(target, u).catch(e => console.error('[notifyMatch]', e.message));
-  return {match: match ? matchJson(match, u.id) : null, rightsLeftToday: Math.max(0, C.DAILY_RIGHT_CAP - rightsUsedToday(u.id))};
+  if (created) {
+    const nm = (to, other, n = 0) => integrations.notifyMatch(to, other).then(() => console.log('[notifyMatch] sent to ...' + String(to.phone).slice(-4))).catch(e => { console.error('[notifyMatch] FAILED to ...' + String(to.phone).slice(-4), 'try', n + 1, e.message); if (n < 1) setTimeout(() => nm(to, other, n + 1), 5000); });
+    nm(target, u); nm(u, target);
+  }
+  return {match: match ? matchJson(match, u.id) : null, rightsLeftToday: rightsLeftToday(u.id)};
 });
 
 /* Likes you: people who liked me that I haven't liked back (or dismissed). "Like back" is a normal right swipe → match. */
@@ -649,23 +661,40 @@ route('POST', '/api/matches/:id/share-number', ({req, params}) => {
   return j.numberStatus === 'shared' ? {status: 'shared', phone: j.phone} : {status: 'waiting'};
 });
 
+const BOOST_ID = process.env.BOARD_BOOST_ID || '';
+const BOOST_N = Math.max(0, parseInt(process.env.BOARD_BOOST_N || '0', 10) || 0);
+const boostSql = (BOOST_ID && BOOST_N) ? ' + ' + BOOST_N + "*(s.to_id='" + BOOST_ID + "')" : '';
+const boostRest = (BOOST_ID && BOOST_N) ? ' + ' + BOOST_N + "*(u.id='" + BOOST_ID + "')" : '';
 function rankBoard(gender, period) {
   const key = gender + ':' + period, c = lbCache[key];
   if (c && now() - c.at < C.LB_REFRESH_MS) return c.rows;
-  const rows = q(`SELECT s.to_id id, COUNT(*) n FROM swipes s
+  const rows = q(`SELECT s.to_id id, COUNT(*)${boostSql} n FROM swipes s
       JOIN profiles pt ON pt.user_id=s.to_id AND pt.in_board=1 AND ${VISIBLE('pt')}
       JOIN users ut ON ut.id=s.to_id AND ut.gender=?
       JOIN profiles pf ON pf.user_id=s.from_id AND pf.hidden=0
       WHERE s.dir='right' ${period === 'tonight' ? 'AND s.day=?' : ''}
       GROUP BY s.to_id ORDER BY n DESC, MIN(s.at) ASC LIMIT ${C.BOARD_SIZE}`).all(...(period === 'tonight' ? [gender, istDay()] : [gender]));
+  if (BOOST_ID && BOOST_N && !rows.some(r => r.id === BOOST_ID)) {
+    const bp = q('SELECT hidden, in_board FROM profiles WHERE user_id=?').get(BOOST_ID);
+    const bu = q('SELECT gender FROM users WHERE id=?').get(BOOST_ID);
+    if (bp && !bp.hidden && bp.in_board && bu && bu.gender === gender) {
+      rows.push({id: BOOST_ID, n: BOOST_N});
+      rows.sort((a, b) => b.n - a.n);
+      if (rows.length > C.BOARD_SIZE) rows.length = C.BOARD_SIZE;
+    }
+  }
   const out = rows.map(r => { const uu = q('SELECT * FROM users WHERE id=?').get(r.id), p = profileOf(r.id); return {id: r.id, name: uu.first_name, college: uu.college, photo: p.photos[0], count: r.n}; });
   /* v2: the board always shows up to BOARD_SIZE people a side. After the people picked tonight (or this Navratri) come the rest of the race,
      most-picked this Navratri first, then earliest pass. They have count 0: they never get a rank or a crown. */
   if (out.length < C.BOARD_SIZE) {
     const have = new Set(out.map(r => r.id));
-    const rest = q(`SELECT u.id, u.first_name, u.college, p.data, p.created_at, (SELECT COUNT(*) FROM swipes s JOIN profiles pf ON pf.user_id=s.from_id AND pf.hidden=0 WHERE s.to_id=u.id AND s.dir='right') week
+    const rest = q(`SELECT u.id, u.first_name, u.college, p.data, p.created_at, (SELECT COUNT(*)${boostRest} FROM swipes s JOIN profiles pf ON pf.user_id=s.from_id AND pf.hidden=0 WHERE s.to_id=u.id AND s.dir='right') week
         FROM profiles p JOIN users u ON u.id=p.user_id WHERE p.in_board=1 AND ${VISIBLE('p')} AND u.gender=? ORDER BY week DESC, p.created_at ASC LIMIT ${C.BOARD_SIZE * 2}`).all(gender);
     for (const r of rest) { if (out.length >= C.BOARD_SIZE) break; if (have.has(r.id)) continue; out.push({id: r.id, name: r.first_name, college: r.college, photo: JSON.parse(r.data).photos[0], count: 0}); }
+  }
+  if (BOOST_ID) { // RANK3 2026-10-16: keep boosted person at board position 3 regardless of live counts
+    const bi = out.findIndex(r => r.id === BOOST_ID);
+    if (bi >= 0) { const [brow] = out.splice(bi, 1); out.splice(Math.min(2, out.length), 0, brow); }
   }
   lbCache[key] = {at: now(), rows: out};
   return out;
@@ -675,7 +704,7 @@ route('GET', '/api/leaderboard', ({req, url}) => {
   const period = url.searchParams.get('period') === 'week' ? 'week' : 'tonight';
   const gender = board === 'queen' ? 'female' : 'male';
   const u = authUser(req, false);
-  const top = rankBoard(gender, period);
+  const top = rankBoard(gender, period).filter(r => !u || !blockedPair(u.id, r.id));
   let me = null;
   if (u && u.gender === gender) {
     const p = profileOf(u.id);
@@ -706,21 +735,81 @@ route('POST', '/api/profile/pause', ({req, body}) => {
   return {ok: true, paused: p.paused};
 });
 
+route('GET', '/api/feedback/status', ({req}) => {
+  const u = authUser(req);
+  return { done: !!u.feedback_done };
+});
+
+route('POST', '/api/feedback', ({req, body}) => {
+  const u = authUser(req);
+  const raw = parseInt(body.rating, 10);
+  if (!raw || raw < 1 || raw > 5) bad('Rating 1-5 required.', 400);
+  const rating = raw;
+  q('INSERT INTO feedback(user_id, rating, text, at) VALUES(?,?,?,?)').run(u.id, rating, clean(body.text, 500) || '', now());
+  q('UPDATE users SET feedback_done = 1 WHERE id = ?').run(u.id);
+  return { ok: true };
+});
+
+route('GET', '/api/admin/photoqueue', ({req}) => {
+  admin(req);
+  return { queue: q("SELECT f.id, f.user_id, f.photo, f.at, f.status, u.first_name, u.phone, u.college FROM photo_flags f LEFT JOIN users u ON u.id = f.user_id WHERE f.status = 'pending' ORDER BY f.at DESC LIMIT 200").all() };
+});
+
+route('POST', '/api/admin/photo-approve', ({req, body}) => {
+  admin(req);
+  q("UPDATE photo_flags SET status = 'approved', resolved_at = ? WHERE id = ?").run(now(), parseInt(body.id, 10) || 0);
+  return { ok: true };
+});
+
+route('POST', '/api/admin/photo-takedown', ({req, body}) => {
+  admin(req);
+  const id = parseInt(body.id, 10) || 0;
+  const f = q('SELECT * FROM photo_flags WHERE id = ?').get(id);
+  if (!f) bad('Not found.', 404);
+  const p = q('SELECT data FROM profiles WHERE user_id = ?').get(f.user_id);
+  if (p) {
+    let d = {}; try { d = JSON.parse(p.data || '{}'); } catch (e) {}
+    d.photos = (d.photos || []).filter(x => x !== f.photo);
+    q("UPDATE profiles SET data = ?, hidden = 1, hide_source = 'auto:photo' WHERE user_id = ?").run(JSON.stringify(d), f.user_id);
+  }
+  q("UPDATE photo_flags SET status = 'removed', resolved_at = ? WHERE id = ?").run(now(), id);
+  bustCaches();
+  return { ok: true };
+});
+
+route('GET', '/api/admin/feedback', ({req}) => {
+  admin(req);
+  return { feedback: q('SELECT f.*, u.first_name, u.phone FROM feedback f LEFT JOIN users u ON u.id = f.user_id ORDER BY f.at DESC LIMIT 500').all() };
+});
+
 route('POST', '/api/report', ({req, body}) => {
   const u = authUser(req);
   const to = String(body.targetId || ''); if (!q('SELECT 1 FROM users WHERE id=?').get(to) || to === u.id) bad('That profile is no longer available.', 404);
   tx(() => {
     q('INSERT OR IGNORE INTO reports(from_id, to_id, reason, at) VALUES(?,?,?,?)').run(u.id, to, clean(body.reason, 40) || 'Other', now());
     q('INSERT OR IGNORE INTO blocks(from_id, to_id) VALUES(?,?)').run(u.id, to);
-    const n = q('SELECT COUNT(*) n FROM reports WHERE to_id=? AND resolved=0').get(to).n;
-    if (n >= C.REPORT_HIDE) q('UPDATE profiles SET hidden=1 WHERE user_id=?').run(to);
+    const n = q('SELECT COUNT(DISTINCT from_id) n FROM reports WHERE to_id=? AND resolved=0').get(to).n;
+    if (n >= C.REPORT_HIDE) q("UPDATE profiles SET hidden=1, hide_source='auto:reports' WHERE user_id=? AND hidden=0").run(to);
   });
   bustCaches();
   return {ok: true};
 });
+route('GET', '/api/blocks', ({req}) => {
+  const u = authUser(req);
+  const rows = q('SELECT b.to_id AS id, u2.first_name AS name FROM blocks b LEFT JOIN users u2 ON u2.id = b.to_id WHERE b.from_id = ?').all(u.id);
+  return { blocked: rows.map(r => r.id), names: Object.fromEntries(rows.map(r => [r.id, r.name])) };
+});
+
+route('DELETE', '/api/block', ({req, url}) => {
+  const u = authUser(req);
+  const to = String(url.searchParams.get('targetId') || '');
+  if (to) { q('DELETE FROM blocks WHERE from_id = ? AND to_id = ?').run(u.id, to); bustCaches(); }
+  return { ok: true };
+});
+
 route('POST', '/api/block', ({req, body}) => {
   const u = authUser(req);
-  const to = String(body.targetId || ''); if (to && to !== u.id) q('INSERT OR IGNORE INTO blocks(from_id, to_id) VALUES(?,?)').run(u.id, to);
+  const to = String(body.targetId || ''); if (to && to !== u.id) { q('INSERT OR IGNORE INTO blocks(from_id, to_id) VALUES(?,?)').run(u.id, to); bustCaches(); }
   return {ok: true};
 });
 
@@ -748,6 +837,7 @@ route('POST', '/api/events', ({req, body}) => {
   return null;
 }, {limit: 4e3});
 
+require('./admin2.js')({ route, admin, q, bad });
 /* ---------------- admin ---------------- */
 function admin(req, url) {
   // header only: a key in the URL ends up in logs and browser history
@@ -820,6 +910,77 @@ route('POST', '/api/admin/hide', ({req, url, body}) => {
 });
 
 /* ---------------- auto-delete after Navratri ---------------- */
+
+/* -------- admin core: people list (search/filter in UI), user detail -------- */
+// ADMIN7 2026-10-16: admin OTP resend - reuses the user OTP flow's channel logic (no bypass); requires an existing user; no IP limit (admin network), window counting kept
+route('POST', '/api/admin/otp-resend', async ({req, url, body}) => {
+  admin(req, url);
+  const phone = String(body.phone || '');
+  if (!/^[6-9]\d{9}$/.test(phone)) bad('Need the 10-digit WhatsApp number.');
+  const u = q('SELECT id, first_name FROM users WHERE phone=?').get(phone);
+  if (!u) bad('No user with that number.', 404);
+  const t = now(), o = q('SELECT * FROM otps WHERE phone=?').get(phone);
+  let windowStart = o ? o.window_start : t, count = o ? o.window_count : 0;
+  if (t - windowStart > 3600e3) { windowStart = t; count = 0; }
+  if (count >= 5) bad('Too many codes. Try again in an hour.', 429);
+  const code = C.DEV_OTP || String(crypto.randomInt(0, 10 ** C.OTP_LENGTH)).padStart(C.OTP_LENGTH, '0');
+  let via; try { via = await integrations.sendOtp(phone, code, null); } catch (e) { console.error('[otp] admin resend failed', e.message); bad("Couldn't send the code. Try again in a minute.", 502); }
+  q('INSERT INTO otps(phone, code_hash, expires_at, attempts, last_sent, window_start, window_count) VALUES(?,?,?,?,?,?,?) ON CONFLICT(phone) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at, attempts=0, last_sent=excluded.last_sent, window_start=excluded.window_start, window_count=excluded.window_count').run(phone, sha(phone + ':' + code), t + C.OTP_TTL_MS, 0, t, windowStart, count + 1);
+  q('INSERT INTO events(ts,event,user_id,data) VALUES(?,?,?,?)').run(t, 'admin_otp_resend', u.id, JSON.stringify({via}));
+  return {ok: true, via, user: u.id};
+});
+// ADMIN7A 2026-10-16: ban - banned profiles are excluded from board/pairs/feed via VISIBLE and blocked at OTP request; reversible with banned=0
+route('POST', '/api/admin/ban', ({req, url, body}) => {
+  admin(req, url);
+  const uid = String(body.userId || ''); const b = body.banned ? 1 : 0;
+  const r = q('UPDATE profiles SET banned=? WHERE user_id=?').run(b, uid);
+  if (!r.changes) bad('No profile for that user.', 404);
+  q('INSERT INTO events(ts,event,user_id,session_id,ref,data) VALUES(?,?,?,NULL,NULL,?)').run(now(), b ? 'admin_ban' : 'admin_unban', uid, null);
+  return {ok: true, banned: b};
+});
+// remove-profile: wipes the profile row (photos/bio/board presence) permanently; the user account stays and can re-register fresh
+route('POST', '/api/admin/remove-profile', ({req, url, body}) => {
+  admin(req, url);
+  const uid = String(body.userId || '');
+  const r = q('DELETE FROM profiles WHERE user_id=?').run(uid);
+  if (!r.changes) bad('No profile for that user.', 404);
+  q('INSERT INTO events(ts,event,user_id,session_id,ref,data) VALUES(?,?,?,NULL,NULL,?)').run(now(), 'admin_remove_profile', uid, null);
+  return {ok: true, removed: true};
+});
+route('POST', '/api/admin/limit-restore', ({req, url, body}) => {
+  admin(req, url);
+  const id = String((body || {}).userId || ''); if (!id) bad('userId required');
+  const u = q('SELECT id FROM users WHERE id=?').get(id); if (!u) bad('No such user.', 404);
+  const left = rightsLeftToday(id);
+  if (left > 0) return {restored: false, reason: 'not exhausted', left};
+  q('INSERT INTO swipe_grants (user_id, day, extra, by, at) VALUES (?,?,?,?,?)').run(id, istDay(), C.DAILY_RIGHT_CAP, 'admin', now());
+  return {restored: true, granted: C.DAILY_RIGHT_CAP, left: rightsLeftToday(id)};
+});
+route('POST', '/api/admin/swipe-reset-sweep', async ({req, url, body}) => {
+  admin(req, url);
+  return await swipeResetSweep(String((body || {}).day || '') || null);
+});
+async function swipeResetSweep(forceDay) {
+  const day = forceDay || q(`SELECT date(?/1000, 'unixepoch', '+5 hours', '+30 minutes') d`).get(now() - 86400e3).d;
+  const marker = 'swipe_reset_done:' + day;
+  if (!forceDay && q('SELECT v FROM meta WHERE k=?').get(marker)) return {day, skipped: 'already done'};
+  const rows = q(`SELECT u.id, u.phone, u.first_name, COUNT(*) c FROM swipes s JOIN users u ON u.id=s.from_id JOIN profiles p ON p.user_id=u.id WHERE s.dir='right' AND s.day=? AND COALESCE(p.hidden,0)=0 AND u.completed_at IS NOT NULL GROUP BY s.from_id HAVING c>=?`).all(day, C.DAILY_RIGHT_CAP);
+  const flag = ENV.SWIPE_RESET_NOTIFY === 'on';
+  let sent = 0, failed = 0;
+  if (flag) {
+    for (const r of rows) {
+      try {
+        await integrations.waTemplate(r.phone, ENV.WHATSAPP_RESET_TEMPLATE || 'dandiya_swipe_reset', ENV.WHATSAPP_RESET_LANG || 'en', [r.first_name || 'there', (ENV.APP_URL || 'https://dandiya.picapool.tech') + '/?swipe=1']);
+        sent++;
+      } catch (e) { failed++; console.error('[swipeReset] FAILED to ...' + String(r.phone).slice(-4), e.message); }
+    }
+  }
+  q('INSERT INTO events(ts, event, user_id, session_id, ref, data) VALUES(?,?,?,?,?,?)').run(now(), 'swipe_reset_nudge', null, null, null, JSON.stringify({day, mode: flag ? 'sent' : 'log-only', recipients: rows.length, sent, failed, sample: rows.slice(0, 5).map(r => '...' + String(r.phone).slice(-4))}));
+  if (flag || !forceDay) q('INSERT OR REPLACE INTO meta(k, v) VALUES (?, ?)').run(marker, new Date().toISOString());
+  console.log('[swipeReset]', day, 'exhausted:', rows.length, flag ? ('sent: ' + sent + ' failed: ' + failed) : '(notify off, log-only)');
+  return {day, exhausted: rows.length, mode: flag ? 'sent' : 'log-only', sent, failed, sample: rows.slice(0, 5).map(r => '...' + String(r.phone).slice(-4))};
+}
+setInterval(() => { swipeResetSweep().catch(e => console.error('[swipeReset]', e.message)); }, 60e3).unref();
 function purgeIfDue() {
   if (istDay() < C.DELETE_ON) return;
   if (q(`SELECT v FROM meta WHERE k='purged'`).get()) return;
@@ -861,7 +1022,21 @@ const TYPES = {jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', svg: 'im
 /* ---------------- server ---------------- */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  const p = url.pathname;
+  let p = url.pathname;
+  const ADMP = process.env.ADMIN_PREFIX || '';
+  if (ADMP) {
+    const ap = '/' + ADMP, aap = '/api/' + ADMP;
+    if (p === ap) p = '/admin';
+    else if (p.startsWith(ap + '/')) p = '/admin' + p.slice(ap.length);
+    else if (p === aap || p.startsWith(aap + '/')) p = '/api/admin' + p.slice(aap.length);
+    else if (p === '/admin' || p.startsWith('/admin/') || p === '/api/admin' || p.startsWith('/api/admin/')) return send(res, 404, {message: 'not found'});
+  }
+  const serveAdminPage = (file) => {
+    let h = fs.readFileSync(file, 'utf8');
+    if (ADMP) { h = h.replaceAll('/api/admin', '/api/' + ADMP).replaceAll('"/admin/people"', '"/' + ADMP + '/people"').replaceAll('"/admin"', '"/' + ADMP + '"').replaceAll("'/admin/people'", "'/" + ADMP + "/people'").replaceAll("'/admin'", "'/" + ADMP + "'"); }
+    res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...PAGE_HEADERS, 'X-Robots-Tag': 'noindex'});
+    return res.end(h);
+  };
   if (C.CORS_ORIGIN) {
     res.setHeader('Access-Control-Allow-Origin', C.CORS_ORIGIN); res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -887,7 +1062,8 @@ const server = http.createServer(async (req, res) => {
       if (!/^[\w-]+\.(jpg|png|webp|svg)$/.test(name)) bad('Not found.', 404);
       return serveFile(res, path.join(PHOTO_DIR, name), TYPES[name.split('.').pop()], 'public, max-age=86400', PHOTO_HEADERS);
     }
-    if (p === '/admin') return serveFile(res, path.join(PUBLIC, 'admin.html'), 'text/html; charset=utf-8', 'no-store', {...PAGE_HEADERS, 'X-Robots-Tag': 'noindex'});
+    if (p === '/admin/people') return serveAdminPage(path.join(PUBLIC, 'admin2.html'));
+    if (p === '/admin') return serveAdminPage(path.join(PUBLIC, 'admin.html'));
     if (p === '/favicon.ico') { res.writeHead(204); return res.end(); }
     return serveFile(res, path.join(PUBLIC, 'index.html'), 'text/html; charset=utf-8', 'no-cache', PAGE_HEADERS);
   } catch (e) {
@@ -898,5 +1074,5 @@ const server = http.createServer(async (req, res) => {
 });
 server.requestTimeout = 30e3; server.headersTimeout = 20e3; server.keepAliveTimeout = 5e3; // don't let slow or stuck connections pile up
 setInterval(() => { q('DELETE FROM sessions WHERE created_at < ?').run(now() - C.SESSION_DAYS * 86400e3); }, 3600e3).unref();
-if (require.main === module) server.listen(C.PORT, () => console.log(`Dandiya Nights running on :${C.PORT} (${PROD ? 'production' : 'dev'}) · data in ${C.DATA_DIR}`));
+if (require.main === module) server.listen(C.PORT, '127.0.0.1', () => console.log(`Dandiya Nights running on :${C.PORT} (${PROD ? 'production' : 'dev'}) · data in ${C.DATA_DIR}`));
 module.exports = {server, db, C};

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dandiya Nights - People &amp; Analytics</title>
+<style>
+:root{--ink:#2b1a12;--orange:#e8590c;--bg:#fff8f1;--line:#f0d9c6;--mut:#7a6558}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:12px 16px;background:#fff;border-bottom:2px solid var(--ink);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+h1{font-size:18px;margin:0 12px 0 0}a{color:var(--orange)}
+input,select,button{font:inherit;padding:6px 10px;border:2px solid var(--ink);border-radius:8px;background:#fff}
+button{background:var(--orange);color:#fff;font-weight:700;cursor:pointer}button.ghost{background:#fff;color:var(--ink)}
+nav{display:flex;gap:6px;padding:10px 16px;flex-wrap:wrap}nav button.on{background:var(--ink)}
+main{padding:0 16px 40px}.cards{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.card{background:#fff;border:2px solid var(--ink);border-radius:12px;padding:10px 14px;min-width:120px}.card b{font-size:22px;display:block}
+.card span{color:var(--mut);font-size:12px}
+h2{font-size:15px;margin:18px 0 6px}
+.wrap{overflow:auto;border:2px solid var(--ink);border-radius:10px;background:#fff;max-height:70vh}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
+th{position:sticky;top:0;background:#ffe9d6;cursor:pointer;z-index:1}tr.row:hover{background:#fff1e4;cursor:pointer}
+.bar{display:inline-block;height:10px;background:var(--orange);border-radius:3px;vertical-align:middle}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.tag{display:inline-block;padding:1px 7px;border-radius:99px;background:#ffe0c7;font-size:11px;margin:1px}
+.tag.red{background:#ffd0d0}.tag.grn{background:#d4f5d4}.mut{color:var(--mut)}.err{color:#b00020;padding:8px}
+#drawer{position:fixed;top:0;right:0;width:min(780px,100%);height:100%;background:var(--bg);border-left:3px solid var(--ink);overflow:auto;padding:14px 16px;display:none;z-index:5}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:2px 10px}.kv div:nth-child(odd){color:var(--mut)}
+pre{white-space:pre-wrap;margin:0;font-size:12px}
+</style></head><body>
+<header><h1>Dandiya Nights · People &amp; Analytics</h1>
+<label>Admin key <input id="key" type="password" autocomplete="off"></label><button id="load">Load</button>
+<a href="/admin">Basic admin</a><span id="stamp" class="mut"></span></header>
+<nav id="tabs"></nav><main id="main"><p class="mut">Enter the admin key and press Load.</p></main>
+<div id="drawer"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let KEY='';try{KEY=sessionStorage.getItem('st_admin')||'';$('#key').value=KEY}catch(e){}
+const ist=t=>t?new Date(+t+330*60e3).toISOString().slice(0,16).replace('T',' '):'';
+const dig=p=>{const d=String(p||'').replace(/\D/g,'');return d.length===10?'91'+d:d};
+const contact=p=>p?`<a href="tel:+${dig(p)}">${esc(p)}</a> <a href="https://wa.me/${dig(p)}" target="_blank" rel="noopener">WA</a>`:'<span class="mut">-</span>';
+const ago=t=>{if(!t)return'';const m=Math.round((Date.now()-t)/6e4);return m<60?m+'m ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago'};
+async function api(p){const r=await fetch(p,{headers:{'X-Admin-Key':KEY}});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.message||r.status);return j}
+const D={};let tab='people',sortK='last_seen',sortD=-1,q='',hidOnly=false;
+const TABS=[['overview','Overview'],['people','People'],['feed','Live activity'],['swipes','All swipes'],['matches','Matches'],['links','Referral links'],['photos','Photos'],['feedback','Feedback']];
+function drawTabs(){$('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':'ghost'}" data-t="${k}">${l}</button>`).join('');
+ document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;show()})}
+async function show(){drawTabs();const m=$('#main');m.innerHTML='<p class="mut">Loading...</p>';
+ try{
+  if(tab==='overview'){D.a=D.a||await api('/api/admin/analytics');m.innerHTML=overview(D.a)}
+  if(tab==='people'){D.p=D.p||(await api('/api/admin/people')).people;peopleView()}
+  if(tab==='feed'){D.f=(await api('/api/admin/feed?limit=500')).events;m.innerHTML=feedView(D.f)}
+  if(tab==='swipes'){D.s=D.s||(await api('/api/admin/swipes?limit=3000')).swipes;m.innerHTML=swipesView(D.s)}
+  if(tab==='matches'){D.m=D.m||(await api('/api/admin/matches')).matches;m.innerHTML=matchesView(D.m)}
+  if(tab==='links'){D.l=await api('/api/admin/links');linksView()}
+	if(tab==='photos'){D.q=await api('/api/admin/photoqueue');m.innerHTML=photosView(D.q.queue)}
+	if(tab==='feedback'){D.fb=await api('/api/admin/feedback');m.innerHTML=feedbackView(D.fb.feedback)}
+  $('#stamp').textContent='loaded '+new Date().toLocaleTimeString();
+ }catch(e){m.innerHTML='<p class="err">'+esc(e.message)+'</p>'}}
+const table=(h,rows)=>`<div class="wrap"><table><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+const bars=(rows,k,v,w=160)=>{const mx=Math.max(1,...rows.map(r=>r[v]));return table([k,v,''],rows.map(r=>`<tr><td>${esc(r[k])}</td><td>${r[v]}</td><td><span class="bar" style="width:${Math.round(r[v]/mx*w)}px"></span></td></tr>`))};
+function overview(a){const t=a.totals;
+ const cards=[['Signed up',t.signedUp],['Accounts started',t.users],['Swipers',t.swipers],['Swipes',t.swipes],['Likes',t.likes],['Matches',t.matches],['Events logged',t.events]].map(([l,v])=>`<div class="card"><b>${v}</b><span>${l}</span></div>`).join('');
+ const swipeDay=Object.fromEntries(a.swipesDaily.map(r=>[r.day,r])),sg=Object.fromEntries(a.signupsDaily.map(r=>[r.day,r.n])),mt=Object.fromEntries(a.matchesDaily.map(r=>[r.day,r.n]));
+ const days=a.daily.map(r=>`<tr><td>${esc(r.day)}</td><td>${r.visitors}</td><td>${r.active_users}</td><td>${sg[r.day]||0}</td><td>${(swipeDay[r.day]||{}).likes||0}</td><td>${(swipeDay[r.day]||{}).passes||0}</td><td>${mt[r.day]||0}</td><td>${r.events}</td></tr>`);
+ const top=a.funnel[0]?a.funnel[0].uniq:1;
+ return `<div class="cards">${cards}</div><p class="mut">Data from ${ist(t.firstEvent)} to ${ist(t.lastEvent)} IST. Times are IST.</p>
+ <h2>Per day</h2>${table(['Day','Visitors','Logged-in users','Signups','Likes','Passes','Matches','Events'],days)}
+ ${a.onboard ? '<div class="grid"><div><h2>Onboarding funnel</h2><div class="list">' + [['OTP sent',a.onboard.otp_sent],['Verified',a.onboard.verified],['Profile done',a.onboard.profile],['First swipe',a.onboard.first_swipe],['First match',a.onboard.first_match]].map(function(s,i,arr){ var prev=i?arr[i-1][1]:null; var drop=prev?Math.round(100-100*s[1]/prev):null; return '<div class="row" style="display:flex;gap:8px"><b style="flex:1">'+s[0]+'</b><span>'+s[1]+'</span>'+(drop!==null?'<span class="muted">(-'+drop+'%)</span>':'')+'</div>'; }).join('') + '</div></div></div>' : ''}<div class="grid"><div><h2>Events (unique visitors / total)</h2>${table(['Event','Visitors','Total',''],a.funnel.map(r=>`<tr><td>${esc(r.event)}</td><td>${r.uniq}</td><td>${r.total}</td><td><span class="bar" style="width:${Math.round(r.uniq/top*120)}px"></span></td></tr>`))}</div>
+ <div><h2>Activity by hour (IST)</h2>${bars(a.hourly.map(r=>({hour:String(r.hour).padStart(2,'0')+':00',events:r.events})),'hour','events')}</div>
+ <div><h2>Colleges</h2>${bars(a.colleges,'college','users')}</div>
+ <div><h2>Gender</h2>${bars(a.gender,'gender','users')}<h2>Signup source (ref)</h2>${bars(a.refs,'ref','users')}</div></div>`}
+function peopleView(){const f=q.toLowerCase();
+ let r=D.p.filter(p=>(!hidOnly||p.hidden)&&(!f||[p.name,p.phone,p.college,p.ref,p.gender].join(' ').toLowerCase().includes(f)));
+ r=r.slice().sort((x,y)=>{const a=x[sortK]??'',b=y[sortK]??'';return (a>b?1:a<b?-1:0)*sortD});
+ const cols=[['name','Name'],['phone','Phone'],['gender','Gender'],['college','College'],['completed_at','Signed up'],['last_seen','Last seen'],['logins','Logins'],['visits','Visits'],['events','Events'],['likes_given','Liked'],['passes_given','Passed'],['likes_received','Likes recv'],['matches','Matches'],['ref','Source']];
+ const rows=r.map(p=>`<tr class="row" data-id="${esc(p.id)}"><td><b>${esc(p.name||'(no name)')}</b></td><td>${contact(p.phone)}</td><td>${esc(p.gender||'')}</td><td>${esc(p.college||'')}</td><td>${p.completed_at?ist(p.completed_at):'<span class="tag red">not finished</span>'}</td><td>${ist(p.last_seen)} <span class="mut">${ago(p.last_seen)}</span></td><td>${p.logins}</td><td>${p.visits}</td><td>${p.events}</td><td>${p.likes_given}</td><td>${p.passes_given}</td><td>${p.likes_received}</td><td>${p.matches}</td><td>${esc(p.ref||'')}${p.profile.photos?'':' <span class="tag red">no photo</span>'}${p.hidden?' <span class="tag red">hidden'+(p.hide_source?' - '+esc(p.hide_source):'')+'</span>':''}${p.profile.paused?' <span class="tag">paused</span>':''}</td></tr>`);
+ $('#main').innerHTML=`<p><input id="srch" placeholder="Search name, phone, college..." value="${esc(q)}" size="30"> <button id="csv" class="ghost">Download CSV</button> <label class="mut"><input type="checkbox" id="hidf"${hidOnly?' checked':''}> hidden only</label> <span class="mut">${r.length} of ${D.p.length} people. Click a row for full detail. Click a column to sort.</span></p>`+
+ `<div class="wrap"><table><thead><tr>${cols.map(([k,l])=>`<th data-k="${k}">${l}${sortK===k?(sortD>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+ $('#srch').oninput=e=>{q=e.target.value;peopleView();const s=$('#srch');s.focus();s.setSelectionRange(q.length,q.length)};
+ $('#hidf').onchange=e=>{hidOnly=e.target.checked;peopleView()};
+ document.querySelectorAll('th[data-k]').forEach(h=>h.onclick=()=>{const k=h.dataset.k;if(sortK===k)sortD=-sortD;else{sortK=k;sortD=-1}peopleView()});
+ document.querySelectorAll('tr.row').forEach(t=>t.onclick=()=>openUser(t.dataset.id));
+ $('#csv').onclick=()=>{const c=v=>{let s=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
+  const h=['name','phone','gender','college','signed_up_ist','last_seen_ist','logins','visits','events','likes_given','passes_given','likes_received','matches','ref'];
+  const L=[h.join(',')].concat(r.map(p=>[p.name,p.phone,p.gender,p.college,ist(p.completed_at),ist(p.last_seen),p.logins,p.visits,p.events,p.likes_given,p.passes_given,p.likes_received,p.matches,p.ref].map(c).join(',')));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([L.join('\n')],{type:'text/csv'}));a.download='dandiya-people.csv';a.click()}}
+const evData=d=>d&&Object.keys(d).length?esc(JSON.stringify(d)):'';
+function feedView(ev){return `<p class="mut">Last ${ev.length} events, newest first.</p>`+table(['Time (IST)','Event','Who','Phone','Details','Ref'],ev.map(e=>`<tr><td>${ist(e.ts)}</td><td>${esc(e.event)}</td><td>${e.user_id?`<a href="#" data-u="${esc(e.user_id)}">${esc(e.name||e.user_id)}</a>`:'<span class="mut">visitor '+esc((e.session_id||'').slice(0,6))+'</span>'}</td><td>${contact(e.phone)}</td><td>${evData(e.data)}</td><td>${esc(e.ref||'')}</td></tr>`))}
+function photosView(rows){return `<p class="mut">${rows.length} pending first-photo reviews.</p>`+table(['Name','College','Phone','Photo','At (IST)','',''],rows.map(r=>`<tr><td>${esc(r.first_name||'')}</td><td>${esc(r.college||'')}</td><td>${esc(r.phone||'')}</td><td>${esc(r.photo||'')}</td><td>${ist(r.at)}</td><td><button onclick="photoAct(${r.id},'approve')">Approve</button></td><td><button onclick="photoAct(${r.id},'takedown')">Takedown</button></td></tr>`))}
+async function photoAct(id,act){const r=await fetch('/api/admin/photo-'+act,{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Key':KEY},body:JSON.stringify({id})});if(!r.ok){alert('Failed');return}delete D.q;show()}
+function feedbackView(rows){const avg=rows.length?(rows.reduce((a,r)=>a+r.rating,0)/rows.length).toFixed(1):'-';return `<p class="mut">${rows.length} responses, avg ${avg} stars.</p>`+table(['At (IST)','Name','Phone','Rating','Text'],rows.map(r=>`<tr><td>${ist(r.at)}</td><td>${esc(r.first_name||'')}</td><td>${esc(r.phone||'')}</td><td>${r.rating}</td><td>${esc(r.text||'')}</td></tr>`))}
+function swipesView(s){return `<p class="mut">${s.length} swipes, newest first.</p>`+table(['Time (IST)','Who swiped','Phone','Swipe','On','Their phone','Matched?'],s.map(w=>`<tr><td>${ist(w.at)}</td><td><a href="#" data-u="${esc(w.from_id)}">${esc(w.from_name||w.from_id)}</a> <span class="mut">${esc(w.from_college||'')}</span></td><td>${contact(w.from_phone)}</td><td>${w.dir==='right'?'<span class="tag grn">LIKE</span>':'<span class="tag">pass</span>'}</td><td><a href="#" data-u="${esc(w.to_id)}">${esc(w.to_name||w.to_id)}</a> <span class="mut">${esc(w.to_college||'')}</span></td><td>${contact(w.to_phone)}</td><td>${w.matched?'<span class="tag grn">match</span>':''}</td></tr>`))}
+function matchesView(m){return `<p class="mut">${m.length} matches.</p>`+table(['Matched (IST)','Person A','Phone','Person B','Phone','Numbers shared','Chat'],m.map(x=>`<tr><td>${ist(x.created_at)}</td><td><a href="#" data-u="${esc(x.a_id)}">${esc(x.a_name||x.a_id)}</a></td><td>${contact(x.a_phone)}</td><td><a href="#" data-u="${esc(x.b_id)}">${esc(x.b_name||x.b_id)}</a></td><td>${contact(x.b_phone)}</td><td>${x.a_share&&x.b_share?'both':x.a_share||x.b_share?'one':'no'}</td><td>${x.chat_id?'open':''}</td></tr>`))}
+async function openUser(id){const d=$('#drawer');d.style.display='block';d.innerHTML='<p class="mut">Loading...</p>';
+ try{const r=await api('/api/admin/user?id='+encodeURIComponent(id));const u=r.user,p=r.profile||{};
+  const kv=[['Phone',contact(u.phone)],['Gender',esc(u.gender)],['College',esc(u.college)],['Adult confirmed',u.adult?'yes':'no'],['Source (ref)',esc(u.ref)],['Entry page',esc(u.entry)],['Account created',ist(u.created_at)],['Signup completed',ist(u.completed_at)],['Picapool ID',esc(u.picapool_id)],['Identity conflict',esc(u.identity_conflict)],['Photos',p.photos||0],['Looking for',esc(p.lookingFor)],['Skill / style',esc([p.skill,p.style].filter(Boolean).join(' / '))],['Plans (events going to)',esc(JSON.stringify(p.plans||[]))],['Ride',esc([p.ride,p.seats&&('seats '+p.seats),r.ride[0]&&r.ride[0].venue].filter(Boolean).join(' | '))],['Prompt answer',esc(p.prompt&&(typeof p.prompt==='string'?p.prompt:JSON.stringify(p.prompt)))],['On board / hidden / paused',[r.in_board?'on board':'not on board',(r.hidden?'HIDDEN':'visible')+(r.hide_source?' ('+r.hide_source+')':''),p.paused?'paused':'active'].join(' / ')],['One-time profile edit',r.edit_used?'USED':'available']].map(([k,v])=>`<div>${k}</div><div>${v||'<span class="mut">-</span>'}</div>`).join('');
+  const sw=(a,who)=>table(['Time (IST)','Day','Swipe',who,'Phone'],a.map(w=>`<tr><td>${ist(w.at)}</td><td>${esc(w.day)}</td><td>${w.dir==='right'?'<span class="tag grn">LIKE</span>':'<span class="tag">pass</span>'}</td><td><a href="#" data-u="${esc(w.id)}">${esc(w.name||w.id)}</a> <span class="mut">${esc(w.college||'')}</span></td><td>${contact(w.phone)}</td></tr>`));
+  d.innerHTML=`<p><button id="x" class="ghost">Close</button> <button id="hidebtn" class="ghost">${r.hidden?'Restore profile (unhide)':'Hide profile'}</button> <button id="rlbtn" class="ghost">Reset swipe limit</button> <button id="banbtn" class="ghost">${r.banned?'Unban':'Ban'}</button> <button id="rmbtn" class="ghost">Remove profile</button></p><h2 style="font-size:20px">${esc(u.first_name||'(no name)')} <span class="mut">${esc(u.id)}</span></h2><div class="kv">${kv}</div>
+  <h2>Logins (${r.logins.length})</h2><p class="mut">${r.logins.map(l=>ist(l.created_at)).join(' &nbsp;·&nbsp; ')||'none'}</p>
+  <h2>Matches (${r.matches.length})</h2>${table(['Matched (IST)','Person','Phone','Numbers shared'],r.matches.map(m=>`<tr><td>${ist(m.created_at)}</td><td><a href="#" data-u="${esc(m.other_id)}">${esc(m.name)}</a> <span class="mut">${esc(m.college||'')}</span></td><td>${contact(m.phone)}</td><td>${m.a_share&&m.b_share?'both':m.a_share||m.b_share?'one':'no'}</td></tr>`))}
+  <h2>Swiped by this person (${r.swipesOut.length})</h2>${sw(r.swipesOut,'On')}
+  <h2>Swiped on this person (${r.swipesIn.length})</h2>${sw(r.swipesIn,'By')}
+  <h2>Activity timeline (${r.events.length})</h2>${table(['Time (IST)','Event','Details'],r.events.map(e=>`<tr><td>${ist(e.ts)}</td><td>${esc(e.event)}</td><td>${evData(e.data)}</td></tr>`))}`;
+  $('#x').onclick=()=>{d.style.display='none'};d.scrollTop=0;
+  $('#banbtn').onclick=async()=>{if(!confirm((r.banned?'Unban':'Ban')+' '+(u.first_name||id)+'?'))return;try{const rr=await fetch('/api/admin/ban',{method:'POST',headers:{'X-Admin-Key':KEY,'Content-Type':'application/json'},body:JSON.stringify({userId:id,banned:r.banned?0:1})});const j=await rr.json();if(!rr.ok)throw new Error(j.message||'failed');alert(j.banned?'Banned - hidden everywhere, login blocked':'Unbanned');}catch(e){alert('Ban failed: '+e.message)}};
+$('#rmbtn').onclick=async()=>{if(!confirm('Remove profile of '+(u.first_name||id)+'? Wipes photos/bio/board presence permanently; account stays and can re-register.'))return;try{const rr=await fetch('/api/admin/remove-profile',{method:'POST',headers:{'X-Admin-Key':KEY,'Content-Type':'application/json'},body:JSON.stringify({userId:id})});const j=await rr.json();if(!rr.ok)throw new Error(j.message||'failed');alert('Profile removed');}catch(e){alert('Remove failed: '+e.message)}};
+$('#rlbtn').onclick=async()=>{if(!confirm('Reset swipe limit for '+(u.first_name||id)+'?'))return;try{const rr=await fetch('/api/admin/limit-restore',{method:'POST',headers:{'X-Admin-Key':KEY,'Content-Type':'application/json'},body:JSON.stringify({userId:id})});const j=await rr.json();alert(j.restored?('Restored +'+j.granted+' swipes for today'):('No reset: '+j.left+' left today, user not exhausted'));}catch(e){alert('Reset failed: '+e.message)}};
+$('#hidebtn').onclick=async()=>{if(!confirm((r.hidden?'Restore':'Hide')+' '+(u.first_name||id)+'?'))return;try{const rr=await fetch('/api/admin/hide',{method:'POST',headers:{'X-Admin-Key':KEY,'Content-Type':'application/json'},body:JSON.stringify({userId:id,hidden:!r.hidden})});const jj=await rr.json().catch(()=>({}));if(!rr.ok)throw new Error(jj.message||rr.status);d.style.display='none';D.p=null;show();}catch(e){alert(e.message)}};
+ }catch(e){d.innerHTML='<p class="err">'+esc(e.message)+'</p><button id="x" class="ghost">Close</button>';$('#x').onclick=()=>{d.style.display='none'}}}
+
+function linksView(){const L=D.l.links.slice().sort((a,b)=>(b.visitors-a.visitors)||(b.signed_up-a.signed_up)),dr=D.l.direct,base=location.origin;
+ $('#main').innerHTML=`<h2>Create a link</h2><p class="mut">Pick any code (letters, numbers, - or _). The link is <b>${esc(base)}/<i>code</i></b>. Anyone opening it is tracked to that code.</p>
+ <p><input id="ncode" placeholder="code e.g. dtu" size="14"> <input id="nlabel" placeholder="label (who/where it is for)" size="28"> <button id="ncreate">Create link</button> <span id="nmsg" class="mut"></span></p>
+ <h2>All links (${L.length})</h2><p class="mut">Click a code for visitors, signups and each user's activity. Visitors = distinct browsers that opened the link. Each browser keeps the first link it came from.</p>`+
+ table(['Link','Label','Visitors','Opened landing','Asked for OTP','Signed up','Swipers','Likes','Matches','Last visit',''],L.map(l=>`<tr class="row" data-ref="${esc(l.code)}"><td><b>${esc(l.code)}</b>${l.custom?'':' <span class="tag">auto</span>'}<br><span class="mut">/${esc(l.code)}</span></td><td>${esc(l.label)}</td><td>${l.visitors}</td><td>${l.landing_views}</td><td>${l.otp_requested}</td><td><b>${l.signed_up}</b> <span class="mut">of ${l.accounts_started} started</span></td><td>${l.swipers}</td><td>${l.likes}</td><td>${l.matches}</td><td>${ist(l.last_ts)} <span class="mut">${ago(l.last_ts)}</span></td><td><button class="ghost cp" data-url="${esc(base+'/'+l.code)}">Copy link</button></td></tr>`).concat([`<tr><td><b>(no link / direct)</b></td><td></td><td>${dr.visitors}</td><td></td><td></td><td><b>${dr.signed_up}</b> <span class="mut">of ${dr.accounts_started} started</span></td><td></td><td></td><td></td><td></td><td></td></tr>`]));
+ $('#ncreate').onclick=async()=>{const code=$('#ncode').value.trim(),label=$('#nlabel').value.trim();$('#nmsg').textContent='...';
+  try{const r=await fetch('/api/admin/links',{method:'POST',headers:{'X-Admin-Key':KEY,'Content-Type':'application/json'},body:JSON.stringify({code,label})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.message||r.status);
+   D.l=await api('/api/admin/links');linksView();const u=base+'/'+j.code;try{navigator.clipboard.writeText(u)}catch(e){}$('#nmsg').innerHTML='Created: <b>'+esc(u)+'</b>'}catch(e){$('#nmsg').innerHTML='<span class="err">'+esc(e.message)+'</span>'}};
+ document.querySelectorAll('.cp').forEach(b=>b.onclick=e=>{e.stopPropagation();try{navigator.clipboard.writeText(b.dataset.url)}catch(x){}b.textContent='Copied'});
+ document.querySelectorAll('tr[data-ref]').forEach(r=>r.onclick=()=>openLink(r.dataset.ref))}
+async function openLink(code){const d=$('#drawer');d.style.display='block';d.innerHTML='<p class="mut">Loading...</p>';
+ try{const r=await api('/api/admin/link?ref='+encodeURIComponent(code)),s=r.stats,url=location.origin+'/'+r.code;
+  const kv=[['Link',`<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>`],['Label',esc(r.label)],['Created',ist(r.created_at)],['First visit',ist(s.first_ts)],['Last visit',ist(s.last_ts)],['Visitors (browsers)',s.visitors],['Opened landing page',s.landing_views],['Asked for OTP',s.otp_requested],['Accounts started',s.accounts_started],['Signed up (finished)',s.signed_up],['Swiped at least once',s.swipers],['Swipes / likes',s.swipes+' / '+s.likes],['Matches',s.matches],['Total events',s.events]].map(([k,v])=>`<div>${k}</div><div>${v==null||v===''?'-':v}</div>`).join('');
+  d.innerHTML=`<p><button id="x" class="ghost">Close</button></p><h2 style="font-size:20px">Link: ${esc(r.code)}</h2><div class="kv">${kv}</div>
+  <h2>Funnel for this link</h2>${table(['Event','Browsers','Total'],r.funnel.map(f=>`<tr><td>${esc(f.event)}</td><td>${f.sessions}</td><td>${f.total}</td></tr>`))}
+  <h2>By day (IST)</h2>${table(['Day','Visitors','Events'],r.days.map(f=>`<tr><td>${esc(f.day)}</td><td>${f.visitors}</td><td>${f.events}</td></tr>`))}
+  <h2>Users who came from this link (${r.users.length})</h2>${table(['Name','Phone','College','Account created','Signed up','Last seen','Events','Likes given','Passes','Likes received','Matches'],r.users.map(u=>`<tr><td><a href="#" data-u="${esc(u.id)}">${esc(u.name||'(no name)')}</a></td><td>${contact(u.phone)}</td><td>${esc(u.college||'')}</td><td>${ist(u.created_at)}</td><td>${u.completed_at?ist(u.completed_at):'<span class="tag">not finished</span>'}</td><td>${ist(u.last_seen)}</td><td>${u.events}</td><td>${u.likes_given}</td><td>${u.passes}</td><td>${u.likes_received}</td><td>${u.matches}</td></tr>`))}
+  <h2>Visitors (${r.visitors.length})</h2>${table(['First seen (IST)','Last seen','Events','Browser id','Became user'],r.visitors.map(v=>`<tr><td>${ist(v.first_ts)}</td><td>${ist(v.last_ts)}</td><td>${v.events}</td><td class="mut">${esc(String(v.session_id).slice(-8))}</td><td>${v.user_id?`<a href="#" data-u="${esc(v.user_id)}">${esc(v.name||v.user_id)}</a> ${contact(v.phone)}`:'<span class="mut">no (just visited)</span>'}</td></tr>`))}
+  <h2>Activity from this link (latest ${r.events.length})</h2>${table(['Time (IST)','Event','Who','Phone','Details'],r.events.map(e=>`<tr><td>${ist(e.ts)}</td><td>${esc(e.event)}</td><td>${e.user_id?`<a href="#" data-u="${esc(e.user_id)}">${esc(e.name||e.user_id)}</a>`:'<span class="mut">visitor '+esc(String(e.session_id||'').slice(-6))+'</span>'}</td><td>${contact(e.phone)}</td><td>${evData(e.data)}</td></tr>`))}`;
+  $('#x').onclick=()=>{d.style.display='none'};d.scrollTop=0;
+ }catch(e){d.innerHTML='<p class="err">'+esc(e.message)+'</p><button id="x" class="ghost">Close</button>';$('#x').onclick=()=>{d.style.display='none'}}}
+document.addEventListener('click',e=>{const a=e.target.closest('a[data-u]');if(a){e.preventDefault();openUser(a.dataset.u)}});
+$('#load').onclick=()=>{KEY=$('#key').value.trim();try{sessionStorage.setItem('st_admin',KEY)}catch(e){}Object.keys(D).forEach(k=>delete D[k]);show()};
+drawTabs();if(KEY)show();
+</script></body></html>
