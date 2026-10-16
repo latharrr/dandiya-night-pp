@@ -1541,7 +1541,7 @@ function showMatch(m) {
     <p class="night-sub">${sh.length ? `You’re both going ${sh[0].name ? `to ${esc(sh[0].name)} ` : ''}${esc(whenText(sh[0].date))}. ${CONFIG.CHAT_ENABLED ? 'Say hi' : 'Swap numbers'} and pick a place to meet.` : `You both picked each other. ${CONFIG.CHAT_ENABLED ? 'Say hi' : 'Swap numbers'} and find a time that works.`}</p>
     ${CONFIG.CHAT_ENABLED ? `<button class="btn glow" id="mChat">Say hi</button><button class="btn light" id="mNum">Swap numbers</button>` : `<button class="btn glow" id="mApp">Open in app</button><button class="btn light" id="mNum">Swap numbers</button>`}
     <button class="text-btn" id="mKeep">Keep exploring</button>
-    <p class="why">${IC.lock} ${CONFIG.CHAT_ENABLED ? CHAT_WHY : 'Chat happens in the Picapool app - your number stays private.'}</p>`;
+    <p class="why">${IC.lock} ${CONFIG.CHAT_ENABLED ? CHAT_WHY : 'We can\'t verify everyone here, so we\'d rather your number never leaves you. On Picapool you share a profile link and chat end-to-end encrypted.'}</p>`;
   app.appendChild(ov);
   modalA11y(ov, document.activeElement, () => $('#mKeep', ov).click());
   S.seenMatchIds = [...new Set([...S.seenMatchIds, m.id])]; save();
@@ -1552,12 +1552,10 @@ function showMatch(m) {
 }
 function openInAppSheet(m) {
   const p = m.person; track('open_in_app', {match: m.id});
-  sheet(`<div class="duo">${photoOr(myPhoto())}${photoOr(p.photos?.[0])}</div>
-    <h2>Chat in the Picapool app<em>your number stays private.</em></h2>
-    <p class="p">Log in to Picapool with this same number, +91 ${fmtPhone(S.phone)}. You get a username there, so you can chat without your number ever being shown.</p>
-    <a class="btn glow" id="oa" href="${CONFIG.PICA10_LINK}" target="_blank" rel="noopener">Open in app</a>
-    <button class="btn light" id="oaNum">Swap numbers instead</button>
-    <p class="why">${IC.lock} Your number is never shown to other users - on Dandiya or on Picapool.</p>`, s => {
+  sheet(`<h2>Your number is<em>yours.</em></h2>
+    <p class="p">Giving a stranger your number is the part everyone worries about, and we can't verify everyone on this page. So we'd rather you didn't have to. Picapool chats are end-to-end encrypted, and you only share a profile link.</p>
+    <a class="btn glow" id="oa" href="${CONFIG.PICA10_LINK}" target="_blank" rel="noopener">Chat there instead</a>
+    <button class="text-btn" id="oaNum">Swap numbers anyway</button>`, s => {
     $('#oa', s).onclick = () => track('app_download_click', {from: 'pair_sheet'});
     $('#oaNum', s).onclick = () => numberPrivacy(m);
   });
