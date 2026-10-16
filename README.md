@@ -2,7 +2,7 @@
 
 Picapool's Navratri 2026 web app for Delhi University North Campus. **Find your Dandiya partner:** people say which garba events they're going to (and which day, what time), see who else is going, pair up and swap numbers. Guests can peek at tonight's top 5 before signing up. Garba Queen / Garba King boards, story posters for Instagram and WhatsApp, everything deleted on 20 Oct.
 
-**Status (15 Oct 2026): launch build (v3). Ready to deploy on our own server; login codes and pair alerts switch on with env vars.** Current build: `2026-10-15-v3` · 194 server checks passing + a real-browser run of the whole flow (phone touch swipes, laptop, demo).
+**Status (16 Oct 2026): LIVE at [dandiya.picapool.tech](https://dandiya.picapool.tech) since the evening of 15 Oct.** Login codes over WhatsApp + SMS, pair alerts, Garba Queen / King boards and story sharing all live. Real launch figures at the bottom of this file. Current build: `2026-10-15-v3` · 194 server checks passing + a real-browser run of the whole flow (phone touch swipes, laptop, demo).
 
 ---
 
@@ -112,3 +112,31 @@ After any change: `python3 source/build.py` → `cd server && npm test` → comm
 - /opt/lpu-nights mirrors the same server/ tree; its own .env (PORT 8096, DATA_DIR /var/lib/lpu-nights, APP_URL https://lpu.picapool.tech, clone ADMIN_KEY) stays out of git
 - pm2 app: lpu-nights; DB + photos under /var/lib/lpu-nights
 - Every code change ships to BOTH /opt/dandiya-nights and /opt/lpu-nights, then pm2 restart both
+
+---
+
+## 2026-10-16 - Launch results (live, real figures)
+
+Pulled from the production DB and WhatsApp status callbacks at ~5 PM IST on 16 Oct, about 23 hours after go-live. Nothing projected, nothing rounded up.
+
+**People**
+- 463 accounts created, 452 finished sign-up
+- 392 Dandiya passes made, 211 of them with photos (646 photos uploaded)
+
+**Swiping and pairing**
+- 12,123 swipes: 3,809 picks, 8,314 passes
+- 152 pairs formed
+- 42 pairs swapped numbers (both sides agreed)
+
+**Sharing and rewards**
+- 30 people earned the share bonus (55 bonus swipes given out)
+- 5 people claimed the +10 swipes Picapool popup
+
+**WhatsApp (real sends)**
+- 358 login codes delivered over WhatsApp/SMS
+- Photo-nudge campaign: 238 people messaged -> 67 read, 119 delivered, 46 failed (39 hit Meta's per-person marketing frequency cap, 5 in Meta's experiment group, 1 not on WhatsApp, 1 undeliverable), 6 with no final status yet. The 39 capped sends were retried and accepted; final delivery pending.
+- 7 Garba Queen/King Top-3 alerts, 2 profile notices, 84 pair alerts and other template notifications
+
+**Engagement**
+- In-app photo prompt shown 748 times, completed 528 times
+- 31 feedback notes sent in from users
