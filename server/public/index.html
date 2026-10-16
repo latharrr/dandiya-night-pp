@@ -414,7 +414,7 @@ const CONFIG = {
   BUILD: '2026-10-15-v3',
   PRODUCT: 'Dandiya Nights',
   BOARD_NAME: { female: 'Garba Queen', male: 'Garba King' },
-  DAILY_RIGHT_CAP: 40,           // picks per day; must match server DAILY_RIGHT_CAP
+  DAILY_RIGHT_CAP: 6,           // picks per day; must match server DAILY_RIGHT_CAP
   OTP_LENGTH: 4,                 // must match server OTP_LENGTH
   CHAT_ENABLED: false,           // true once Picapool chat is wired (integrations.createChat). Until then pairs swap numbers
   PICAPOOL_LOOKUP: false,        // true once integrations.findPicapoolUser is wired: shows "We found your Picapool account" after the code
@@ -741,6 +741,8 @@ class MockApi {
 }
 const api = isDemo() ? new MockApi() : new LiveApi();
 let serverRightsLeft = null;
+let serverRightsNextAt = null;
+const nextLabel = () => { if (!serverRightsNextAt) return 'more picks soon'; const m = Math.max(1, Math.round((serverRightsNextAt - Date.now()) / 60000)); return m >= 60 ? `more picks in ~${Math.round(m / 60)}h` : `more picks in ~${m}m`; };
 function localRightsLeft() { return Math.max(0, CONFIG.DAILY_RIGHT_CAP - (S.rightsByDay[todayISO()] || 0)); }
 const rightsLeft = () => serverRightsLeft ?? localRightsLeft();
 
@@ -969,7 +971,7 @@ async function sendPendingLikes() {
   for (const id of ids) {
     try { const r = await api.swipe(id, 'right'); sent++; S.swipes[id] = {dir: 'right', at: Date.now()};
       if (r.match) { S.matches = [r.match, ...S.matches.filter(m => m.id !== r.match.id)]; first ||= r.match; track('match', {from: 'peek'}); }
-      if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday;
+      if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday; serverRightsNextAt = r.rightsNextAt || serverRightsNextAt;
     } catch (e) {}
   }
   S.rightsByDay[todayISO()] = (S.rightsByDay[todayISO()] || 0) + sent;
@@ -1350,7 +1352,7 @@ async function renderFeed() {
       ${S.blocked.length ? `<div class="nudge"><p><b>${S.blocked.length} blocked</b> - hidden from your deck and board.</p><button class="sb" id="blockedOpen">Manage</button></div>` : ''}
     <div id="crownBar"></div>
     <div class="deck" id="deck" role="main"><div class="spinner"></div></div>
-    <div class="actions" id="acts"><button class="round skip" id="nope" aria-label="Skip">${IC.x}</button><span id="actHint">${rightsLeft() <= 0 ? 'more picks at midnight' : 'skip or pair up'}</span><button class="round pair" id="yep" aria-label="Pair up">${IC.heart(22)}</button></div>
+    <div class="actions" id="acts"><button class="round skip" id="nope" aria-label="Skip">${IC.x}</button><span id="actHint">${rightsLeft() <= 0 ? nextLabel() : 'skip or pair up'}</span><button class="round pair" id="yep" aria-label="Pair up">${IC.heart(22)}</button></div>
     ${tabsHtml()}</section>`;
   bindTabs(); renderCrownBar();
   $('#inv').onclick = () => openInvite();
@@ -1360,7 +1362,7 @@ async function renderFeed() {
   $('#doneRev') && ($('#doneRev').onclick = endReview);
   $('#nope').onclick = () => flyTop('left'); $('#yep').onclick = () => flyTop('right');
   if (!feed.queue.length) {
-    try { const r = await api.getFeed({passed: reviewing}); feed.queue = (r.profiles || []).filter(p => !S.blocked.includes(p.id)); if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday; }
+    try { const r = await api.getFeed({passed: reviewing}); feed.queue = (r.profiles || []).filter(p => !S.blocked.includes(p.id)); if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday; serverRightsNextAt = r.rightsNextAt || serverRightsNextAt; }
     catch (e) { if ($('#deck')) { $('#deck').innerHTML = `<div class="empty"><p>${esc(e.message)}</p><button class="btn light" id="retry">Try again</button></div>`; $('#retry').onclick = renderFeed; } return; }
   }
   if (route === 'app' && tab === 'feed') {
@@ -1456,7 +1458,7 @@ function flyOut(el, dir) {
   el.style.transform = `translate(${dir === 'right' ? 130 : -130}%, 20px) rotate(${dir === 'right' ? 18 : -18}deg)`; el.style.opacity = 0;
   setTimeout(() => el.remove(), 380);
 }
-const actHint = () => { const h = $('#actHint'); if (h) h.textContent = rightsLeft() <= 0 ? 'more picks at midnight' : 'skip or pair up'; };
+const actHint = () => { const h = $('#actHint'); if (h) h.textContent = rightsLeft() <= 0 ? nextLabel() : 'skip or pair up'; };
 function keepPeek(p, dir) {
   const g = S.guest;
   if (!g.done.includes(p.id)) g.done.push(p.id);
@@ -1484,7 +1486,7 @@ async function sendSwipe(p, dir) {
     if (route === 'app' && tab === 'feed') { drawDeck(); actHint(); }
     return err.status === 429 && dir === 'right' ? limitSheet() : toast(esc(err.message || 'Couldn’t save that. Check your internet.'));
   }
-  if (typeof r.rightsLeftToday === 'number' && !isDemo()) { serverRightsLeft = r.rightsLeftToday; actHint(); }
+  if (typeof r.rightsLeftToday === 'number' && !isDemo()) { serverRightsLeft = r.rightsLeftToday; serverRightsNextAt = r.rightsNextAt || serverRightsNextAt; actHint(); }
   if (r.match) { S.matches = [r.match, ...S.matches.filter(m => m.id !== r.match.id)]; save(); track('match', {from: review ? 'review' : 'feed'}); showMatch(r.match); }
   else afterSwipePrompts();
 }
@@ -1499,9 +1501,16 @@ function afterSwipePrompts() {
 }
 function limitSheet() {
   track('daily_limit');
-  sheet(`<h2>That’s today’s ${CONFIG.DAILY_RIGHT_CAP} picks.<em>More at midnight.</em></h2>
-    <p class="p">You can still look around and skip. Anyone who picked you is waiting in Pairs.</p>
-    <button class="btn" id="lp1" data-autofocus>See who picked you</button><button class="text-btn" id="lp2">Keep looking</button>`, s => {
+  sheet(`<h2>That's ${CONFIG.DAILY_RIGHT_CAP} picks for now.<em>${nextLabel()}.</em></h2>
+    <p class="p">Share your invite link for +3 picks right away (up to 3x a day). Anyone who picked you is waiting in Pairs.</p>
+    <button class="btn" id="lp0" data-autofocus>Share for +3</button><button class="btn light" id="lp1">See who picked you</button><button class="text-btn" id="lp2">Keep looking</button>`, s => {
+    $('#lp0', s).onclick = async () => {
+      const r = isDemo() ? {ok: true, rightsLeftToday: 3} : await api.req('POST', '/share-bonus').catch(() => null);
+      if (r && r.ok) { serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); } else { toast(r && r.reason === 'share_cap' ? 'Share bonus used up for today.' : 'Could not add picks - try again.'); }
+      const link = shareLink();
+      try { await navigator.share({title: CONFIG.PRODUCT, url: link}); } catch (e) { try { await navigator.clipboard.writeText(link); toast('Invite link copied.'); } catch (e2) {} }
+      track('share', {kind: 'invite_link', via: 'limit_sheet'});
+    };
     $('#lp1', s).onclick = () => { closeSheet(); tab = 'pairs'; pairsTab = 'asked'; go('app'); };
     $('#lp2', s).onclick = () => closeSheet();
   });
@@ -1732,7 +1741,7 @@ async function likeBack(p, btn) {
   btn.disabled = true;
   let r; try { r = await api.swipe(p.id, 'right'); } catch (e) { btn.disabled = false; return toast(esc(e.message)); }
   S.swipes[p.id] = {dir: 'right', at: Date.now(), retried: !!S.swipes[p.id]}; S.rightsByDay[todayISO()] = (S.rightsByDay[todayISO()] || 0) + 1;
-  if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday;
+  if (typeof r.rightsLeftToday === 'number' && !isDemo()) serverRightsLeft = r.rightsLeftToday; serverRightsNextAt = r.rightsNextAt || serverRightsNextAt;
   feed.queue = feed.queue.filter(x => x.id !== p.id); save(); track('like_back');
   if (r.match) { S.matches = [r.match, ...S.matches.filter(m => m.id !== r.match.id)]; save(); track('match', {from: 'likes_you'}); showMatch(r.match); }
   loadReceived();

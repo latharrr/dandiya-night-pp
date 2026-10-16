@@ -26,6 +26,7 @@ const C = {
   DATA_DIR: path.resolve(ENV.DATA_DIR || path.join(__dirname, 'data')),
   ADMIN_KEY: ENV.ADMIN_KEY || (DEV_MODE ? 'dev-admin' : ''),
   DAILY_RIGHT_CAP: +(ENV.DAILY_RIGHT_CAP || 40),
+  RIGHT_CAP: +(ENV.SWIPE_RIGHT_CAP || 6), RIGHT_WINDOW_MS: 5*3600e3, SHARE_BONUS: 3, SHARE_BONUS_CAP: 3,
   OTP_LENGTH: +(ENV.OTP_LENGTH || 4),
   OTP_TTL_MS: 10 * 60e3,
   DELETE_ON: ENV.DELETE_ON || '2026-10-20',
@@ -491,6 +492,27 @@ function popularEvents(limit = 12, min = 2) {
 }
 route('GET', '/api/events/popular', ({req}) => { authUser(req); return {events: popularEvents(12, 2).map(e => e.name)}; });
 
+try { q('ALTER TABLE users ADD COLUMN rb_balance INTEGER').run(); } catch {}
+try { q('ALTER TABLE users ADD COLUMN rb_next_refill INTEGER').run(); } catch {}
+try { q('ALTER TABLE users ADD COLUMN rb_share_day TEXT').run(); } catch {}
+try { q('ALTER TABLE users ADD COLUMN rb_share_count INTEGER DEFAULT 0').run(); } catch {}
+const nextMidnightIST = () => { const IST = 19800e3; return Math.ceil((Date.now() + IST) / 86400e3) * 86400e3 - IST; };
+function getRights(u) {
+  const now = Date.now();
+  let bal = u.rb_balance, ref = u.rb_next_refill;
+  if (bal === null || bal === undefined || !ref || now >= ref) { bal = C.RIGHT_CAP; ref = now + C.RIGHT_WINDOW_MS; q('UPDATE users SET rb_balance=?, rb_next_refill=? WHERE id=?').run(bal, ref, u.id); u.rb_balance = bal; u.rb_next_refill = ref; }
+  return { balance: bal, nextAt: Math.min(ref, nextMidnightIST()), nextRefillAt: ref };
+}
+route('POST', '/api/share-bonus', ({req}) => {
+  const u = authUser(req); needComplete(u);
+  const day = istDay();
+  const cnt = u.rb_share_day === day ? (u.rb_share_count || 0) : 0;
+  if (cnt >= C.SHARE_BONUS_CAP) return {ok: false, reason: 'share_cap'};
+  const rg = getRights(u);
+  const nb = rg.balance + C.SHARE_BONUS;
+  q('UPDATE users SET rb_balance=?, rb_share_day=?, rb_share_count=? WHERE id=?').run(nb, day, cnt + 1, u.id);
+  return {ok: true, rightsLeftToday: nb, sharesUsedToday: cnt + 1};
+});
 function rightsUsedToday(uid) { return q(`SELECT COUNT(*) n FROM swipes WHERE from_id=? AND dir='right' AND day=?`).get(uid, istDay()).n; }
 function grantsToday(uid) { return q('SELECT COALESCE(SUM(extra),0) g FROM swipe_grants WHERE user_id=? AND day=?').get(uid, istDay()).g; }
 function rightsLeftToday(uid) { return Math.max(0, C.DAILY_RIGHT_CAP + grantsToday(uid) - rightsUsedToday(uid)); }
@@ -524,7 +546,7 @@ route('GET', '/api/feed', ({req, url}) => {
   };
   const tiers = [[], [], []]; list.forEach(p => tiers[tier(p)].push(p));
   list = tiers.flatMap((x, i) => shuffle(x, u.id + ':' + today + ':' + i)).slice(0, 100);
-  return {profiles: list, rightsLeftToday: rightsLeftToday(u.id)};
+  { const rg = getRights(u); return {profiles: list, rightsLeftToday: rg.balance, rightsNextAt: rg.nextAt}; }
 });
 
 function matchJson(m, meId) {
@@ -545,8 +567,8 @@ route('POST', '/api/swipe', async ({req, body}) => {
   if (!target || target.id === u.id || target.gender === u.gender) bad('That profile is no longer available.', 404);
   if (blockedPair(u.id, target.id)) bad('That profile is no longer available.', 404);
   const prev = q('SELECT * FROM swipes WHERE from_id=? AND to_id=?').get(u.id, target.id);
-  if (prev && prev.dir === 'right') return {match: null, rightsLeftToday: rightsLeftToday(u.id)};
-  if (dir === 'right' && rightsLeftToday(u.id) <= 0) bad(`That's today's ${C.DAILY_RIGHT_CAP} right swipes. Back tomorrow!`, 429);
+  if (prev && prev.dir === 'right') { const rg0 = getRights(u); return {match: null, rightsLeftToday: rg0.balance, rightsNextAt: rg0.nextAt}; }
+  const __rg = getRights(u); if (dir === 'right' && __rg.balance <= 0) bad('Out of right swipes for now - more picks soon!', 429);
   const t = now(), day = istDay();
   let match = null, created = false;
   tx(() => {
@@ -563,7 +585,7 @@ route('POST', '/api/swipe', async ({req, body}) => {
     const nm = (to, other, n = 0) => integrations.notifyMatch(to, other).then(() => console.log('[notifyMatch] sent to ...' + String(to.phone).slice(-4))).catch(e => { console.error('[notifyMatch] FAILED to ...' + String(to.phone).slice(-4), 'try', n + 1, e.message); if (n < 1) setTimeout(() => nm(to, other, n + 1), 5000); });
     nm(target, u); nm(u, target);
   }
-  return {match: match ? matchJson(match, u.id) : null, rightsLeftToday: rightsLeftToday(u.id)};
+  if (dir === 'right') q('UPDATE users SET rb_balance = MAX(0, COALESCE(rb_balance,0) - 1) WHERE id=?').run(u.id); const __rg2 = getRights(q('SELECT * FROM users WHERE id=?').get(u.id)); return {match: match ? matchJson(match, u.id) : null, rightsLeftToday: __rg2.balance, rightsNextAt: __rg2.nextAt};
 });
 
 /* Likes you: people who liked me that I haven't liked back (or dismissed). "Like back" is a normal right swipe → match. */
@@ -824,6 +846,7 @@ route('GET', '/api/wa-webhook', async ({ url, res }) => {
   res.writeHead(403); res.end('nope'); return undefined;
 });
 route('POST', '/api/wa-webhook', async ({ req, body }) => {
+  try { for (const e of (body && body.entry) || []) console.log('[wa-hook] waba', e.id); } catch {}
   const _sec = process.env.WHATSAPP_APP_SECRET;
   if (_sec) {
     const crypto = require('crypto');
@@ -1093,10 +1116,15 @@ route('POST', '/api/admin/limit-restore', ({req, url, body}) => {
   admin(req, url);
   const id = String((body || {}).userId || ''); if (!id) bad('userId required');
   const u = q('SELECT id FROM users WHERE id=?').get(id); if (!u) bad('No such user.', 404);
-  const left = rightsLeftToday(id);
+  const __u = q('SELECT * FROM users WHERE id=?').get(id); const left = __u ? getRights(__u).balance : 0;
   if (left > 0) return {restored: false, reason: 'not exhausted', left};
-  q('INSERT INTO swipe_grants (user_id, day, extra, by, at) VALUES (?,?,?,?,?)').run(id, istDay(), C.DAILY_RIGHT_CAP, 'admin', now());
-  return {restored: true, granted: C.DAILY_RIGHT_CAP, left: rightsLeftToday(id)};
+  q('UPDATE users SET rb_balance=?, rb_next_refill=? WHERE id=?').run(C.RIGHT_CAP, now() + C.RIGHT_WINDOW_MS, id);
+  return {restored: true, granted: C.RIGHT_CAP, left: C.RIGHT_CAP};
+});
+route('GET', '/api/admin/exhausted', ({req, url}) => {
+  admin(req, url);
+  const rows = q(`SELECT u.id, u.first_name name, u.phone, (SELECT COUNT(*) FROM swipes s WHERE s.from_id=u.id AND s.dir='right' AND s.day=?) usedToday, (SELECT MAX(at) FROM swipes s2 WHERE s2.from_id=u.id AND s2.dir='right') lastRight FROM users u WHERE u.completed_at IS NOT NULL AND u.rb_balance IS NOT NULL AND u.rb_balance <= 0 ORDER BY lastRight DESC LIMIT 200`).all(istDay());
+  return {rows};
 });
 route('POST', '/api/admin/swipe-reset-sweep', async ({req, url, body}) => {
   admin(req, url);
@@ -1106,7 +1134,8 @@ async function swipeResetSweep(forceDay) {
   const day = forceDay || q(`SELECT date(?/1000, 'unixepoch', '+5 hours', '+30 minutes') d`).get(now() - 86400e3).d;
   const marker = 'swipe_reset_done:' + day;
   if (!forceDay && q('SELECT v FROM meta WHERE k=?').get(marker)) return {day, skipped: 'already done'};
-  const rows = q(`SELECT u.id, u.phone, u.first_name, COUNT(*) c FROM swipes s JOIN users u ON u.id=s.from_id JOIN profiles p ON p.user_id=u.id WHERE s.dir='right' AND s.day=? AND COALESCE(p.hidden,0)=0 AND u.completed_at IS NOT NULL GROUP BY s.from_id HAVING c>=?`).all(day, C.DAILY_RIGHT_CAP);
+  const rows = q('SELECT id, phone, first_name FROM users WHERE completed_at IS NOT NULL AND rb_balance IS NOT NULL AND rb_balance <= 0').all();
+  q('UPDATE users SET rb_balance=? WHERE rb_balance IS NOT NULL').run(C.RIGHT_CAP);
   const flag = ENV.SWIPE_RESET_NOTIFY === 'on';
   let sent = 0, failed = 0;
   if (flag) {
