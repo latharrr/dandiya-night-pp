@@ -26,7 +26,7 @@ const C = {
   DATA_DIR: path.resolve(ENV.DATA_DIR || path.join(__dirname, 'data')),
   ADMIN_KEY: ENV.ADMIN_KEY || (DEV_MODE ? 'dev-admin' : ''),
   DAILY_RIGHT_CAP: +(ENV.DAILY_RIGHT_CAP || 40),
-  RIGHT_CAP: +(ENV.SWIPE_RIGHT_CAP || 6), RIGHT_WINDOW_MS: 5*3600e3, SHARE_BONUS: 3, SHARE_BONUS_CAP: 3,
+  RIGHT_CAP: +(ENV.SWIPE_RIGHT_CAP || 6), RIGHT_WINDOW_MS: 5*3600e3, SHARE_BONUS: 3, SHARE_BONUS_CAP: 2,
   OTP_LENGTH: +(ENV.OTP_LENGTH || 4),
   OTP_TTL_MS: 10 * 60e3,
   DELETE_ON: ENV.DELETE_ON || '2026-10-20',
@@ -494,6 +494,7 @@ function popularEvents(limit = 12, min = 2) {
 route('GET', '/api/events/popular', ({req}) => { authUser(req); return {events: popularEvents(12, 2).map(e => e.name)}; });
 
 try { q('ALTER TABLE users ADD COLUMN rb_balance INTEGER').run(); } catch {}
+try { q('ALTER TABLE users ADD COLUMN pica10_at INTEGER').run(); } catch {}
 try { q('ALTER TABLE users ADD COLUMN rb_next_refill INTEGER').run(); } catch {}
 try { q('ALTER TABLE users ADD COLUMN rb_share_day TEXT').run(); } catch {}
 try { q('ALTER TABLE users ADD COLUMN rb_share_count INTEGER DEFAULT 0').run(); } catch {}
@@ -513,6 +514,15 @@ route('POST', '/api/share-bonus', ({req}) => {
   const nb = rg.balance + C.SHARE_BONUS;
   q('UPDATE users SET rb_balance=?, rb_share_day=?, rb_share_count=? WHERE id=?').run(nb, day, cnt + 1, u.id);
   return {ok: true, rightsLeftToday: nb, sharesUsedToday: cnt + 1};
+});
+route('POST', '/api/pica10/claim', ({req}) => {
+  const u = authUser(req); needComplete(u);
+  if (u.pica10_at) return {ok: false, reason: 'already'};
+  const rg = getRights(u);
+  const nb = rg.balance + 10;
+  q('UPDATE users SET pica10_at=?, rb_balance=? WHERE id=?').run(Date.now(), nb, u.id);
+  try { q('INSERT INTO events(ts,event,user_id,data) VALUES(?,?,?,?)').run(Date.now(), 'pica10_grant', u.id, '{}'); } catch (e) {}
+  return {ok: true, rightsLeftToday: nb};
 });
 function rightsUsedToday(uid) { return q(`SELECT COUNT(*) n FROM swipes WHERE from_id=? AND dir='right' AND day=?`).get(uid, istDay()).n; }
 function grantsToday(uid) { return q('SELECT COALESCE(SUM(extra),0) g FROM swipe_grants WHERE user_id=? AND day=?').get(uid, istDay()).g; }

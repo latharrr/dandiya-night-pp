@@ -426,6 +426,7 @@ const CONFIG = {
   APP_DEEPLINK: 'picapool://chat/{chatId}',                                   // only used with CHAT_ENABLED
   PLAY_STORE: 'https://play.google.com/store/apps/details?id=com.picapool',
   APP_STORE: 'https://apps.apple.com/in/app/picapool/id6480370782',
+  PICA10_LINK: 'https://picapool.instally.io/qi153a',
   // Navratri 2026 (Delhi calendar): the dates people can say they're going to an event. Past dates hide automatically. Keep in step with DATES in server.js.
   NIGHTS: [
     {id:'d1', date:'2026-10-11', day:'Sun', colour:'Orange',        hex:'#F7821B'},
@@ -1501,9 +1502,22 @@ function afterSwipePrompts() {
 }
 function limitSheet() {
   track('daily_limit');
+  const claimed = !!S.pica10;
   sheet(`<h2>That's ${CONFIG.DAILY_RIGHT_CAP} picks for now.<em>${nextLabel()}.</em></h2>
-    <p class="p">Share your invite link for +3 picks right away (up to 3x a day). Anyone who picked you is waiting in Pairs.</p>
-    <button class="btn" id="lp0" data-autofocus>Share for +3</button><button class="btn light" id="lp1">See who picked you</button><button class="text-btn" id="lp2">Keep looking</button>`, s => {
+    ${claimed ? '' : `<p class="p">Get <b>+10 picks, free</b>: download the <b>Picapool</b> app and register with this same number, +91 ${fmtPhone(S.phone)}. Picapool is where your campus pools orders, splits cabs and buys &amp; sells with people nearby. Split costs, multiply savings.</p>
+    <button class="btn glow" id="lpPool" data-autofocus>Get Picapool: +10 picks</button>
+    <p class="why">One-time. The +10 lands right away - register on Picapool with the same number so your perks stay linked.</p>`}
+    <p class="p" style="margin-top:10px">Or share your invite link for +3 picks right away (up to 2x a day). Anyone who picked you is waiting in Pairs.</p>
+    <button class="btn${claimed ? '' : ' light'}" id="lp0"${claimed ? ' data-autofocus' : ''}>Share for +3</button><button class="btn light" id="lp1">See who picked you</button><button class="text-btn" id="lp2">Keep looking</button>`, s => {
+    $('#lpPool', s) && ($('#lpPool', s).onclick = async () => {
+      track('pica10_click');
+      window.open(CONFIG.PICA10_LINK, '_blank', 'noopener');
+      if (isDemo()) { toast('Demo: +10 would land here.'); return; }
+      const r = await api.req('POST', '/pica10/claim').catch(() => null);
+      if (r && r.ok) { S.pica10 = true; save(); serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); toast(`${IC.check} +10 picks added.`); }
+      else if (r && r.reason === 'already') { S.pica10 = true; save(); toast('Perk already used.'); }
+      else { toast('Could not add picks - try again.'); }
+    });
     $('#lp0', s).onclick = async () => {
       const r = isDemo() ? {ok: true, rightsLeftToday: 3} : await api.req('POST', '/share-bonus').catch(() => null);
       if (r && r.ok) { serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); } else { toast(r && r.reason === 'share_cap' ? 'Share bonus used up for today.' : 'Could not add picks - try again.'); }
@@ -1525,15 +1539,28 @@ function showMatch(m) {
   ov.innerHTML = `<div class="pp">${photoOr(myPhoto())}<span class="knot">${IC.heart(26)}</span>${photoOr(p.photos?.[0])}</div>
     <h2 class="night-title">You and ${esc(p.name)}<em>are paired.</em></h2>
     <p class="night-sub">${sh.length ? `You’re both going ${sh[0].name ? `to ${esc(sh[0].name)} ` : ''}${esc(whenText(sh[0].date))}. ${CONFIG.CHAT_ENABLED ? 'Say hi' : 'Swap numbers'} and pick a place to meet.` : `You both picked each other. ${CONFIG.CHAT_ENABLED ? 'Say hi' : 'Swap numbers'} and find a time that works.`}</p>
-    ${CONFIG.CHAT_ENABLED ? `<button class="btn glow" id="mChat">Say hi</button><button class="btn light" id="mNum">Swap numbers</button>` : `<button class="btn glow" id="mNum">Swap numbers</button>`}
+    ${CONFIG.CHAT_ENABLED ? `<button class="btn glow" id="mChat">Say hi</button><button class="btn light" id="mNum">Swap numbers</button>` : `<button class="btn glow" id="mApp">Open in app</button><button class="btn light" id="mNum">Swap numbers</button>`}
     <button class="text-btn" id="mKeep">Keep exploring</button>
-    ${CONFIG.CHAT_ENABLED ? `<p class="why">${IC.lock} ${CHAT_WHY}</p>` : ''}`;
+    <p class="why">${IC.lock} ${CONFIG.CHAT_ENABLED ? CHAT_WHY : 'Chat happens in the Picapool app - your number stays private.'}</p>`;
   app.appendChild(ov);
   modalA11y(ov, document.activeElement, () => $('#mKeep', ov).click());
   S.seenMatchIds = [...new Set([...S.seenMatchIds, m.id])]; save();
   $('#mChat', ov) && ($('#mChat', ov).onclick = () => { ov.remove(); chatFlow(m); });
+  $('#mApp', ov) && ($('#mApp', ov).onclick = () => { ov.remove(); openInAppSheet(m); });
   $('#mNum', ov).onclick = () => { ov.remove(); numberPrivacy(m); };
   $('#mKeep', ov).onclick = () => { ov.remove(); refreshNav(); afterSwipePrompts(); };
+}
+function openInAppSheet(m) {
+  const p = m.person; track('open_in_app', {match: m.id});
+  sheet(`<div class="duo">${photoOr(myPhoto())}${photoOr(p.photos?.[0])}</div>
+    <h2>Chat in the Picapool app<em>your number stays private.</em></h2>
+    <p class="p">Log in to Picapool with this same number, +91 ${fmtPhone(S.phone)}. You get a username there, so you can chat without your number ever being shown.</p>
+    <a class="btn glow" id="oa" href="${CONFIG.PICA10_LINK}" target="_blank" rel="noopener">Open in app</a>
+    <button class="btn light" id="oaNum">Swap numbers instead</button>
+    <p class="why">${IC.lock} Your number is never shown to other users - on Dandiya or on Picapool.</p>`, s => {
+    $('#oa', s).onclick = () => track('app_download_click', {from: 'pair_sheet'});
+    $('#oaNum', s).onclick = () => numberPrivacy(m);
+  });
 }
 const storeUrl = () => /iPhone|iPad|iPod/.test(navigator.userAgent) ? CONFIG.APP_STORE : CONFIG.PLAY_STORE;
 const meHasPicapool = () => !!S.user?.hasPicapool;
@@ -1922,6 +1949,9 @@ function cropImage(file, W, H) {
         if (ir > ratio) { sw = sh * ratio; sx = (img.naturalWidth - sw) / 2; } else { sh = sw / ratio; sy = (img.naturalHeight - sh) / 2.6; }
         const c = document.createElement('canvas'); c.width = W; c.height = H;
         const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+        const px = ctx.getImageData(0, 0, W, H).data; let pmn = 255, pmx = 0;
+        for (let i = 0; i < px.length; i += 397 * 4) { const v = (px[i] + px[i + 1] + px[i + 2]) / 3; if (v < pmn) pmn = v; if (v > pmx) pmx = v; }
+        if (pmx - pmn < 12) throw new Error('blank frame');
         URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.8));
       } catch (e) { URL.revokeObjectURL(url); rej(new Error("Couldn't read that photo. Try a JPG or PNG.")); }
     };
