@@ -941,7 +941,7 @@ route('POST', '/api/admin/queue-flush', async ({ req, url }) => {
     const u = q('SELECT first_name, last_wa_inbound FROM users WHERE id=?').get(r.user_id) || {};
     let ok = false;
     if (r.kind === 'nudge') {
-      try { const res2 = await integrations.waTemplate(r.phone, 'dandiya_photo_nudge', process.env.WHATSAPP_OTP_LANG || 'en', [u.first_name || 'there'], null, 'nudge'); ok = !!(res2 && !res2.gated); } catch (e) { ok = false; }
+      try { const res2 = await integrations.waTemplate(r.phone, 'dandiya_photo_nudge', process.env.WHATSAPP_NUDGE_LANG || 'en_US', [u.first_name || 'there'], null, 'nudge'); ok = !!(res2 && !res2.gated); } catch (e) { ok = false; }
     } else {
       if (u.last_wa_inbound && now() - u.last_wa_inbound < 86400000) {
         const res2 = await integrations.waText(r.phone, r.body, r.kind);
