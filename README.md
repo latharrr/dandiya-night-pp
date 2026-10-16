@@ -133,7 +133,7 @@ Pulled from the production DB and WhatsApp status callbacks at ~5 PM IST on 16 O
 - 5 people claimed the +10 swipes Picapool popup
 
 **WhatsApp (real sends)**
-- 358 login codes delivered over WhatsApp/SMS
+- 358 login codes sent over WhatsApp/SMS
 - Photo-nudge campaign: 238 people messaged -> 67 read, 119 delivered, 46 failed (39 hit Meta's per-person marketing frequency cap, 5 in Meta's experiment group, 1 not on WhatsApp, 1 undeliverable), 6 with no final status yet. The 39 capped sends were retried and accepted; final delivery pending.
 - 7 Garba Queen/King Top-3 alerts, 2 profile notices, 84 pair alerts and other template notifications
 
