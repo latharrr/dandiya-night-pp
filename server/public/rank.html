@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Today's Top 3 - Dandiya Nights</title>
+<meta property="og:title" content="Today's Top 3 - Dandiya Nights">
+<meta property="og:description" content="The campus race for the Garba crown. See who's leading tonight.">
+<meta property="og:type" content="website">
+<style>
+  :root { --night:#1E0A16; --night-2:#38121F; --on-night:#FFF4E8; --soft:#D9C4C4; --gold:#C9962F; --marigold:#F2B25C; --accent:#F25F17; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: radial-gradient(120% 90% at 50% 0%, var(--night-2) 0%, var(--night) 60%); color: var(--on-night); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; padding: 28px 18px 48px; }
+  .wrap { max-width: 460px; margin: 0 auto; }
+  .brand { text-align: center; font-family: 'DM Serif Display', Georgia, serif; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--marigold); }
+  h1 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; text-align: center; font-size: 34px; line-height: 1.15; margin: 10px 0 4px; }
+  h1 em { color: var(--marigold); font-style: italic; }
+  .day { text-align: center; color: var(--soft); font-size: 13px; margin-bottom: 26px; }
+  h2 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: 22px; margin: 26px 0 12px; }
+  h2 span { color: var(--marigold); }
+  .card { display: flex; align-items: center; gap: 14px; background: rgba(255,244,232,.06); border: 1px solid rgba(242,178,92,.22); border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; }
+  .card.first { background: linear-gradient(135deg, rgba(201,150,47,.22), rgba(255,244,232,.06)); border-color: var(--gold); }
+  .rank { font-family: 'DM Serif Display', Georgia, serif; font-size: 20px; width: 34px; text-align: center; color: var(--marigold); flex: none; }
+  .ph { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex: none; background: var(--night-2); border: 2px solid rgba(242,178,92,.4); }
+  .who { flex: 1; min-width: 0; }
+  .name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .college { color: var(--soft); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .votes { text-align: right; flex: none; }
+  .votes b { font-family: 'DM Serif Display', Georgia, serif; font-size: 20px; color: var(--marigold); }
+  .votes small { display: block; color: var(--soft); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; }
+  .cta { display: block; text-align: center; background: var(--accent); color: #fff; font-weight: 700; font-size: 16px; border-radius: 999px; padding: 15px; margin-top: 30px; text-decoration: none; }
+  .foot { text-align: center; color: var(--soft); font-size: 12px; margin-top: 16px; }
+  .empty { color: var(--soft); text-align: center; padding: 18px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Dandiya Nights</div>
+  <h1>Tonight's race<em> for the crown.</em></h1>
+  <div class="day" id="day"></div>
+  <h2>Garba <span>Queen</span></h2>
+  <div id="queen"></div>
+  <h2>Garba <span>King</span></h2>
+  <div id="king"></div>
+  <a class="cta" href="/">Think you can take the crown? Open Dandiya</a>
+  <div class="foot">Votes reset every midnight. Final call for today's board is tonight.</div>
+</div>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const medal = r => r === 1 ? '👑' : '#' + r;
+function card(r) {
+  return `<div class="card${r.rank === 1 ? ' first' : ''}">
+    <div class="rank">${medal(r.rank)}</div>
+    ${r.photo ? `<img class="ph" src="${esc(r.photo)}" alt="">` : `<div class="ph"></div>`}
+    <div class="who"><div class="name">${esc(r.name)}</div><div class="college">${esc(r.college || '')}</div></div>
+    <div class="votes"><b>${r.votes}</b><small>votes</small></div>
+  </div>`;
+}
+async function go() {
+  const d = new URLSearchParams(location.search).get('d') || '';
+  const r = await fetch('/api/rankcard' + (d ? '?d=' + encodeURIComponent(d) : ''));
+  const j = await r.json();
+  document.getElementById('day').textContent = new Date(j.day + 'T12:00:00').toLocaleDateString('en-IN', {weekday: 'long', day: 'numeric', month: 'long'});
+  document.getElementById('queen').innerHTML = j.queen.length ? j.queen.map(card).join('') : '<div class="empty">No votes yet tonight - the race is wide open.</div>';
+  document.getElementById('king').innerHTML = j.king.length ? j.king.map(card).join('') : '<div class="empty">No votes yet tonight - the race is wide open.</div>';
+}
+go().catch(() => { document.getElementById('day').textContent = 'Could not load the board - try again.'; });
+</script>
+</body>
+</html>

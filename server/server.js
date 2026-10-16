@@ -770,6 +770,30 @@ function rankBoard(gender, period) {
   lbCache[key] = {at: now(), rows: out};
   return out;
 }
+function organicTop3(gender, day) {
+  const rows = q(`SELECT s.to_id id, COUNT(*) n FROM swipes s
+      JOIN profiles pt ON pt.user_id=s.to_id AND pt.in_board=1 AND ${VISIBLE('pt')}
+      JOIN users ut ON ut.id=s.to_id AND ut.gender=?
+      JOIN profiles pf ON pf.user_id=s.from_id AND pf.hidden=0
+      WHERE s.dir='right' AND s.day=?
+      GROUP BY s.to_id ORDER BY n DESC, MIN(s.at) ASC LIMIT 4`).all(gender, day);
+  const out = [];
+  for (const r of rows) {
+    if (BOOST_ID && r.id === BOOST_ID) continue; // organic only: the boosted pin never gets a rank-card spot or a congrats
+    const uu = q('SELECT first_name, college FROM users WHERE id=?').get(r.id);
+    const p = profileOf(r.id);
+    out.push({id: r.id, name: uu.first_name, college: uu.college, photo: (p.photos || [])[0] || null, votes: r.n});
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+route('GET', '/api/rankcard', ({url}) => {
+  let day = String(url.searchParams.get('d') || ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) day = istDay();
+  if (day > istDay()) day = istDay();
+  const pub = r => ({rank: 0, name: r.name, college: r.college, photo: r.photo, votes: r.votes});
+  const mark = (rows) => rows.map((r, i) => ({...pub(r), rank: i + 1}));
+  return {day, queen: mark(organicTop3('female', day)), king: mark(organicTop3('male', day))};
+});
 route('GET', '/api/leaderboard', ({req, url}) => {
   const board = url.searchParams.get('board') === 'king' ? 'king' : 'queen';
   const period = url.searchParams.get('period') === 'week' ? 'week' : 'tonight';
@@ -1243,6 +1267,58 @@ async function swipeResetSweep(forceDay) {
   return {day, exhausted: rows.length, mode: flag ? 'sent' : 'log-only', sent, failed, sample: rows.slice(0, 5).map(r => '...' + String(r.phone).slice(-4))};
 }
 setInterval(() => { swipeResetSweep().catch(e => console.error('[swipeReset]', e.message)); }, 60e3).unref();
+route('GET', '/api/admin/top3-preview', ({req, url}) => {
+  admin(req, url);
+  const day = istDay();
+  return {day, enabled: metaGet('top3_enabled') === '1', done: !!metaGet('top3_done:' + day), campaignEnds: '2026-10-18', queen: organicTop3('female', day), king: organicTop3('male', day)};
+});
+route('POST', '/api/admin/top3-enable', ({req, url, body}) => {
+  admin(req, url);
+  metaSet('top3_enabled', body && body.on ? '1' : '0');
+  return {enabled: metaGet('top3_enabled') === '1'};
+});
+route('POST', '/api/admin/top3-test', async ({req, url, body}) => {
+  admin(req, url);
+  const phone = String((body || {}).phone || '');
+  if (!/^\d{10,15}$/.test(phone)) bad('Need a phone number.', 400);
+  const day = istDay();
+  const top = organicTop3('male', day);
+  const votes = top.length ? top[0].votes : 0;
+  const res2 = await integrations.waTemplate(phone, ENV.WHATSAPP_TOP3_TEMPLATE || 'dandiya_top3_rank', ENV.WHATSAPP_TOP3_LANG || 'en_US', ['Deep', '1', 'King', String(votes)], day, 'top3');
+  return {ok: !!(res2 && !res2.gated), votes, day};
+});
+route('POST', '/api/admin/top3-sweep', async ({req, url, body}) => {
+  admin(req, url);
+  return await top3Sweep(String((body || {}).day || '') || null);
+});
+async function top3Sweep(forceDay) {
+  const day = forceDay || istDay();
+  if (day > '2026-10-18') return {day, skipped: 'campaign over (last send Oct 18)'};
+  const marker = 'top3_done:' + day;
+  if (!forceDay && metaGet(marker)) return {day, skipped: 'already done'};
+  const istHour = new Date(now() + 5.5 * 3600e3).getUTCHours();
+  if (!forceDay && istHour !== 20) return {day, skipped: 'not 8 PM IST'};
+  if (metaGet('top3_enabled') !== '1') return {day, skipped: 'disabled'};
+  let sent = 0, failed = 0; const skipped = [];
+  for (const [gender, label] of [['female', 'Queen'], ['male', 'King']]) {
+    const top = organicTop3(gender, day);
+    if (top.length < 3) { skipped.push(label + ':' + top.length); continue; }
+    for (let i = 0; i < 3; i++) {
+      const r = top[i];
+      const u = q('SELECT phone, first_name FROM users WHERE id=?').get(r.id);
+      try {
+        if (capped131026(u.phone)) { waLog(String(u.phone), 'top3', 'suppressed', '131026-cooldown'); continue; }
+        await integrations.waTemplate(u.phone, ENV.WHATSAPP_TOP3_TEMPLATE || 'dandiya_top3_rank', ENV.WHATSAPP_TOP3_LANG || 'en_US', [u.first_name || 'there', String(i + 1), label, String(r.votes)], day, 'top3');
+        sent++;
+      } catch (e) { failed++; console.error('[top3] FAILED to ...' + String(u.phone).slice(-4), e.message); }
+    }
+  }
+  q('INSERT INTO events(ts, event, user_id, session_id, ref, data) VALUES(?,?,?,?,?,?)').run(now(), 'top3_send', null, null, null, JSON.stringify({day, sent, failed, skipped}));
+  if (!forceDay) metaSet(marker, new Date().toISOString());
+  console.log('[top3]', day, 'sent:', sent, 'failed:', failed, skipped.join(','));
+  return {day, sent, failed, skipped};
+}
+setInterval(() => { top3Sweep().catch(e => console.error('[top3]', e.message)); }, 60e3).unref();
 function purgeIfDue() {
   if (istDay() < C.DELETE_ON) return;
   if (q(`SELECT v FROM meta WHERE k='purged'`).get()) return;
@@ -1326,6 +1402,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/admin/people') return serveAdminPage(path.join(PUBLIC, 'admin2.html'));
     if (p === '/admin') return serveAdminPage(path.join(PUBLIC, 'admin.html'));
+    if (p === '/rank') return serveFile(res, path.join(PUBLIC, 'rank.html'), 'text/html; charset=utf-8', 'no-cache', PAGE_HEADERS);
     if (p === '/favicon.ico') { res.writeHead(204); return res.end(); }
     return serveFile(res, path.join(PUBLIC, 'index.html'), 'text/html; charset=utf-8', 'no-cache', PAGE_HEADERS);
   } catch (e) {
