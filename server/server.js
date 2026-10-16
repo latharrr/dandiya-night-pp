@@ -331,9 +331,9 @@ function linkPicapool(u, pre) {
   let first = u.first_name, gen = u.gender, college = u.college;
   if (name && name !== u.first_name) { nameChanged = !!u.first_name; first = name; }          // Picapool's first name wins, before and after the card exists
   if (gender && gender !== u.gender) {
-    if (hasCard && u.gender) conflict = 'gender';                                            // never flip gender under an existing card: matches, likes and the board depend on it
+    if (hasCard && u.gender) { if (u.identity_conflict !== 'gender') conflictNotice(u, 'gender').catch(function(){}); conflict = 'gender'; }                                            // never flip gender under an existing card: matches, likes and the board depend on it
     else gen = gender;                                                                        // no card yet: just use Picapool's
-  } else if (conflict === 'gender' && gender === u.gender) conflict = null;                  // they fixed it in the app
+  } else if (conflict === 'gender' && gender === u.gender) { conflict = null; q(`UPDATE profiles SET hidden=0, hide_source=NULL WHERE user_id=? AND hide_source='auto:gender-conflict'`).run(u.id); }                  // they fixed it in the app
   if (!college && pre.college) college = clean(pre.college, 60);                              // college stays whatever they chose here, if they chose one
   q('UPDATE users SET picapool_id=?, first_name=?, gender=?, college=?, identity_conflict=?, picapool_synced_at=? WHERE id=?')
     .run(String(pre.picapoolId), first, gen, college, conflict, now(), u.id);
@@ -921,8 +921,8 @@ route('POST', '/api/wa-webhook', async ({ req, body }) => {
       const ph = String(m.from || '').replace(/^91/, '');
       if (/^[6-9]\d{9}$/.test(ph)) q('UPDATE users SET last_wa_inbound=? WHERE phone=?').run(m.ts || now(), ph);
     }
-      const stats = (body.entry || []).flatMap(e => (e.changes || []).flatMap(c => ((c.value || {}).statuses || []).map(s => ({ id: s.id, st: s.status, to: s.recipient_id }))));
-      for (const s of stats) { try { waLog(String(s.to || '-'), 'status', String(s.st || ''), String(s.id || '')); } catch (e) {} }
+      const stats = (body.entry || []).flatMap(e => (e.changes || []).flatMap(c => ((c.value || {}).statuses || []).map(s => ({ id: s.id, st: s.status, to: s.recipient_id, err: (s.errors || []).map(x => String(x.code) + ':' + String(x.title || '')).join(';') }))));
+      for (const s of stats) { try { waLog(String(s.to || '-'), 'status', String(s.st || ''), String(s.id || '') + (s.err ? ' err=' + s.err : '')); } catch (e) {} }
   } catch (e) {}
   return { ok: true };
 });
@@ -994,6 +994,24 @@ route('GET', '/api/admin/outbound-queue', async ({ req, url }) => {
   admin(req, url);
   return { rows: q(`SELECT id, phone, kind, reason, created_at FROM outbound_queue WHERE status='pending' ORDER BY created_at DESC LIMIT 100`).all() };
 });
+const CAPPED131026_MS = 3 * 86400000; // 72h marketing-cap cooldown (Meta per-recipient 131026)
+function capped131026(phone) {
+  try { const p10 = String(phone || '').replace(/\D/g, '').slice(-10); if (!p10) return false; const r = q(`SELECT ts FROM wa_log WHERE phone LIKE ? AND status='failed' AND detail LIKE '%131026%' AND ts > ? ORDER BY ts DESC LIMIT 1`).get('%' + p10, now() - CAPPED131026_MS); return !!r; } catch (e) { return false; }
+}
+async function conflictNotice(u, kind) {
+  try {
+    if (kind === 'gender') q(`UPDATE profiles SET hidden=1, hide_source='auto:gender-conflict' WHERE user_id=? AND hidden=0`).run(u.id);
+    const mix = kind === 'gender' ? 'your linked Picapool account shows a different gender than your Dandiya profile' : 'some of your details do not match your linked Picapool account';
+    await integrations.waTemplate(u.phone, 'dandiya_profile_notice', process.env.WHATSAPP_NOTICE_LANG || 'en_US', [u.first_name || 'there', mix, 'open the app and confirm your details'], null, 'profile_notice');
+  } catch (e) { try { waLog(String(u.phone || '-'), 'profile_notice', 'send-failed', String((e && e.message) || e)); } catch (e2) {} }
+}
+route('POST', '/api/admin/profile-notice-test', async ({ req, url, body }) => {
+  admin(req, url);
+  const phone = String((body || {}).phone || '');
+  if (!/^\d{10,15}$/.test(phone)) bad('Need a phone number.', 400);
+  const res2 = await integrations.waTemplate(phone, 'dandiya_profile_notice', process.env.WHATSAPP_NOTICE_LANG || 'en_US', ['Deep', 'your linked Picapool account shows a different gender than your Dandiya profile (TEST)', 'open the app and confirm your details'], null, 'profile_notice');
+  return { ok: !!(res2 && !res2.gated) };
+});
 route('POST', '/api/admin/queue-flush', async ({ req, url }) => {
   admin(req, url);
   const rows = q(`SELECT * FROM outbound_queue WHERE status='pending' LIMIT 50`).all();
@@ -1001,6 +1019,7 @@ route('POST', '/api/admin/queue-flush', async ({ req, url }) => {
   for (const r of rows) {
     const u = q('SELECT first_name, last_wa_inbound FROM users WHERE id=?').get(r.user_id) || {};
     let ok = false;
+    if (r.kind === 'nudge' && capped131026(r.phone)) { q(`UPDATE outbound_queue SET status='suppressed' WHERE id=?`).run(r.id); waLog(r.phone, 'nudge', 'suppressed', '131026-cooldown'); continue; }
     if (r.kind === 'nudge') {
       try { const res2 = await integrations.waTemplate(r.phone, 'dandiya_photo_nudge', process.env.WHATSAPP_NUDGE_LANG || 'en_US', [u.first_name || 'there'], null, 'nudge'); ok = !!(res2 && !res2.gated); } catch (e) { ok = false; }
     } else {
@@ -1202,6 +1221,7 @@ async function swipeResetSweep(forceDay) {
   if (flag) {
     for (const r of rows) {
       try {
+        if (capped131026(r.phone)) { waLog(r.phone, 'reset', 'suppressed', '131026-cooldown'); continue; }
         await integrations.waTemplate(r.phone, ENV.WHATSAPP_RESET_TEMPLATE || 'dandiya_swipe_reset', ENV.WHATSAPP_RESET_LANG || 'en', [r.first_name || 'there', (ENV.APP_URL || 'https://dandiya.picapool.tech') + '/?swipe=1']);
         sent++;
       } catch (e) { failed++; console.error('[swipeReset] FAILED to ...' + String(r.phone).slice(-4), e.message); }

@@ -48,14 +48,14 @@ async function waTemplateInner(phone, name, lang, body = [], button = null) {
   if (body.length) components.push({type: 'body', parameters: body.map(t => ({type: 'text', text: String(t)}))});
   if (button !== null) components.push({type: 'button', sub_type: 'url', index: '0', parameters: [{type: 'text', text: String(button)}]});
   const r = await post(`${WA.base}/${WA.version}/${WA.phoneId}/messages`, {Authorization: `Bearer ${WA.token}`},
-    {messaging_product: 'whatsapp', to: '91' + phone, type: 'template', template: {name, language: {code: lang}, components}});
+    {messaging_product: 'whatsapp', to: ('91' + String(phone || '').replace(/\D/g, '').replace(/^(91)+(?=.{10}$)/g, '')), type: 'template', template: {name, language: {code: lang}, components}});
   if (!r.ok) throw new Error(`WhatsApp ${r.status}: ${r.json?.error?.message || r.text}`);
   return r.json;
 }
 async function sendSms(phone, code) {
   const headers = {authkey: SMS.key, accept: 'application/json'};
   const r = SMS.mode === 'flow'
-    ? await post(`${SMS.base}/api/v5/flow`, headers, {template_id: SMS.template, short_url: '0', recipients: [{mobiles: '91' + phone, [SMS.flowVar]: code}]})
+    ? await post(`${SMS.base}/api/v5/flow`, headers, {template_id: SMS.template, short_url: '0', recipients: [{mobiles: ('91' + String(phone || '').replace(/\D/g, '').replace(/^(91)+(?=.{10}$)/g, '')), [SMS.flowVar]: code}]})
     : await post(`${SMS.base}/api/v5/otp?template_id=${encodeURIComponent(SMS.template)}&mobile=91${phone}&otp=${encodeURIComponent(code)}`, headers, {});
   if (!r.ok || (r.json && r.json.type && r.json.type !== 'success')) throw new Error(`MSG91 ${r.status}: ${r.json?.message || r.text}`);
 }
@@ -84,7 +84,7 @@ async function waText(phone, text, type) {
     const g = waHooks.gate(phone);
     if (!g.ok) { if (waHooks.log) waHooks.log(phone, t, 'gated:' + g.why, String(text).slice(0, 80)); return { gated: g.why }; }
   }
-  const r = await post(`${WA.base}/${WA.version}/${WA.phoneId}/messages`, { Authorization: `Bearer ${WA.token}` }, { messaging_product: 'whatsapp', to: '91' + phone, type: 'text', text: { body: String(text).slice(0, 1000) } });
+  const r = await post(`${WA.base}/${WA.version}/${WA.phoneId}/messages`, { Authorization: `Bearer ${WA.token}` }, { messaging_product: 'whatsapp', to: ('91' + String(phone || '').replace(/\D/g, '').replace(/^(91)+(?=.{10}$)/g, '')), type: 'text', text: { body: String(text).slice(0, 1000) } });
   if (waHooks.log) waHooks.log(phone, t, r && r.ok ? 'sent' : 'failed:' + (r && r.status), String(text).slice(0, 80));
   return r;
 }
