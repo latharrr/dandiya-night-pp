@@ -743,7 +743,7 @@ class MockApi {
 const api = isDemo() ? new MockApi() : new LiveApi();
 let serverRightsLeft = null;
 let serverRightsNextAt = null;
-const nextLabel = () => { if (!serverRightsNextAt) return 'more picks soon'; const m = Math.max(1, Math.round((serverRightsNextAt - Date.now()) / 60000)); return m >= 60 ? `more picks in ~${Math.round(m / 60)}h` : `more picks in ~${m}m`; };
+const nextLabel = () => { if (!serverRightsNextAt) return 'more swipes soon'; const m = Math.max(1, Math.round((serverRightsNextAt - Date.now()) / 60000)); return m >= 60 ? `more swipes in ~${Math.round(m / 60)}h` : `more swipes in ~${m}m`; };
 function localRightsLeft() { return Math.max(0, CONFIG.DAILY_RIGHT_CAP - (S.rightsByDay[todayISO()] || 0)); }
 const rightsLeft = () => serverRightsLeft ?? localRightsLeft();
 
@@ -1503,11 +1503,11 @@ function afterSwipePrompts() {
 function limitSheet() {
   track('daily_limit');
   const claimed = !!S.pica10;
-  sheet(`${claimed ? `<h2>That's ${CONFIG.DAILY_RIGHT_CAP} picks for now.<em>${nextLabel()}.</em></h2>` : `<h2>This page goes<em>offline Oct 20.</em></h2>
+  sheet(`${claimed ? `<h2>That's ${CONFIG.DAILY_RIGHT_CAP} swipes for now.<em>${nextLabel()}.</em></h2>` : `<h2>This page goes<em>offline Oct 20.</em></h2>
     <p class="p">After the last night of garba, Dandiya Nights shuts down - and we can't verify everyone here. If you want to keep talking to someone, do it on Picapool: verified-by-number profiles, and you never hand out your number.</p>
     <button class="btn glow" id="lpPool" data-autofocus>Take it to Picapool</button>
-    <p style="margin:10px 0 0;padding:9px 12px;border-radius:12px;background:#F9E9CC;color:#6B4A0D;font-weight:600;font-size:13.5px;text-align:center">For valuing your privacy: +10 picks, on us.</p>`}
-    <p class="p" style="margin-top:10px">Or share your invite link for +3 picks right away (up to 2x a day). Anyone who picked you is waiting in Pairs.</p>
+    <p style="margin:10px 0 0;padding:9px 12px;border-radius:12px;background:#F9E9CC;color:#6B4A0D;font-weight:600;font-size:13.5px;text-align:center">For valuing your privacy: +10 swipes, on us.</p>`}
+    <p class="p" style="margin-top:10px">Or share your invite link for +3 swipes right away (up to 2x a day). Anyone who picked you is waiting in Pairs.</p>
     <button class="btn${claimed ? '' : ' light'}" id="lp0"${claimed ? ' data-autofocus' : ''}>Share for +3</button><button class="btn light" id="lp1">See who picked you</button><button class="text-btn" id="lp2">Keep looking</button>`, s => {
     $('#lpPool', s) && ($('#lpPool', s).onclick = async () => {
       track('pica10_click');
@@ -1516,11 +1516,11 @@ function limitSheet() {
       const r = await api.req('POST', '/pica10/claim').catch(() => null);
       if (r && r.ok) { S.pica10 = true; save(); serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); toast(`${IC.check} +10 picks added.`); }
       else if (r && r.reason === 'already') { S.pica10 = true; save(); toast('Perk already used.'); }
-      else { toast('Could not add picks - try again.'); }
+      else { toast('Could not add swipes - try again.'); }
     });
     $('#lp0', s).onclick = async () => {
       const r = isDemo() ? {ok: true, rightsLeftToday: 3} : await api.req('POST', '/share-bonus').catch(() => null);
-      if (r && r.ok) { serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); } else { toast(r && r.reason === 'share_cap' ? 'Share bonus used up for today.' : 'Could not add picks - try again.'); }
+      if (r && r.ok) { serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); } else { toast(r && r.reason === 'share_cap' ? 'Share bonus used up for today.' : 'Could not add swipes - try again.'); }
       const link = shareLink();
       try { await navigator.share({title: CONFIG.PRODUCT, url: link}); } catch (e) { try { await navigator.clipboard.writeText(link); toast('Invite link copied.'); } catch (e2) {} }
       track('share', {kind: 'invite_link', via: 'limit_sheet'});
