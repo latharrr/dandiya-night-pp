@@ -1503,10 +1503,10 @@ function afterSwipePrompts() {
 function limitSheet() {
   track('daily_limit');
   const claimed = !!S.pica10;
-  sheet(`<h2>That's ${CONFIG.DAILY_RIGHT_CAP} picks for now.<em>${nextLabel()}.</em></h2>
-    ${claimed ? '' : `<p class="p">Get <b>+10 picks, free</b>: download the <b>Picapool</b> app and register with this same number, +91 ${fmtPhone(S.phone)}. Picapool is where your campus pools orders, splits cabs and buys &amp; sells with people nearby. Split costs, multiply savings.</p>
-    <button class="btn glow" id="lpPool" data-autofocus>Get Picapool: +10 picks</button>
-    <p class="why">One-time. The +10 lands right away - register on Picapool with the same number so your perks stay linked.</p>`}
+  sheet(`${claimed ? `<h2>That's ${CONFIG.DAILY_RIGHT_CAP} picks for now.<em>${nextLabel()}.</em></h2>` : `<h2>This page is<em>temporary.</em></h2>
+    <p class="p">Dandiya Nights wraps up in a few days, and we can't verify everyone here. If you want to keep talking to someone, do it on Picapool: verified-by-number profiles, and you never hand out your number.</p>
+    <button class="btn glow" id="lpPool" data-autofocus>Take it to Picapool</button>
+    <p class="why">Small gesture from our end: +10 picks.</p>`}
     <p class="p" style="margin-top:10px">Or share your invite link for +3 picks right away (up to 2x a day). Anyone who picked you is waiting in Pairs.</p>
     <button class="btn${claimed ? '' : ' light'}" id="lp0"${claimed ? ' data-autofocus' : ''}>Share for +3</button><button class="btn light" id="lp1">See who picked you</button><button class="text-btn" id="lp2">Keep looking</button>`, s => {
     $('#lpPool', s) && ($('#lpPool', s).onclick = async () => {
