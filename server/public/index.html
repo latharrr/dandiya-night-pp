@@ -191,7 +191,9 @@ img{display:block}
 .head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 18px 10px;min-height:62px;flex-shrink:0}
 .head .mark{width:30px;height:30px}
 .head h1{font-family:var(--serif);font-weight:400;font-size:28px;color:var(--wine);line-height:1}
-.head h1 .sponsor-h1{color:var(--gold);opacity:.85;letter-spacing:.05em;font-size:19px;white-space:nowrap}
+.head h1 .sponsor-h1{color:var(--gold);opacity:.85;letter-spacing:.05em;font-size:19px;white-space:nowrap;text-decoration:underline;text-underline-offset:3px}
+.board-ad{display:block;text-align:right;font-size:10.5px;font-weight:500;color:var(--ink-2);opacity:.8;text-decoration:none;margin:-4px 2px 8px}
+.board-ad .ad-tag{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:1px}
 .tonight{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:99px;background:var(--paper);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink-2);white-space:nowrap}
 .tonight i{width:8px;height:8px;border-radius:50%;background:var(--c)}
 .icon-btn{width:40px;height:40px;border-radius:50%;background:var(--paper);border:1px solid var(--line);display:grid;place-items:center;color:var(--ink-2);flex-shrink:0}
@@ -1796,7 +1798,7 @@ let lb = {board: null, period: 'tonight', prev: {}, timer: null};
 async function renderBoard() {
   lb.board ??= myBoardKey();
   app.innerHTML = `${demoFlag()}<section class="screen app">
-    <header class="head"><h1>${lb.board === 'queen' ? CONFIG.BOARD_NAME.female : '<span class="sponsor-h1">BEATS &amp; DANDIYA</span>'}</h1>${tonightChip()}</header>
+    <header class="head"><h1>${lb.board === 'queen' ? CONFIG.BOARD_NAME.female : '<a class="sponsor-h1" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener">BEATS &amp; DANDIYA</a>'}</h1>${tonightChip()}</header><a class="board-ad" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener"><span class="ad-tag">Sponsored</span>Beats &amp; Dandiya S2 · Sat 17 Oct · from Rs 150</a>
     <div class="seg" role="group" aria-label="Board"><button data-b="queen" aria-pressed="${lb.board === 'queen'}">${CONFIG.BOARD_NAME.female}</button><button data-b="king" aria-pressed="${lb.board === 'king'}">${CONFIG.BOARD_NAME.male}</button></div>
     <div class="scroll pad">
       <div class="seg" role="group" aria-label="When" style="margin:0"><button data-p="tonight" aria-pressed="${lb.period === 'tonight'}">Tonight · ${esc(tonight().colour)}</button><button data-p="week" aria-pressed="${lb.period === 'week'}">All of Navratri</button></div>
