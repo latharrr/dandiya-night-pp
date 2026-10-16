@@ -1514,7 +1514,7 @@ function limitSheet() {
       window.open(CONFIG.PICA10_LINK, '_blank', 'noopener');
       if (isDemo()) { toast('Demo: +10 would land here.'); return; }
       const r = await api.req('POST', '/pica10/claim').catch(() => null);
-      if (r && r.ok) { S.pica10 = true; save(); serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); toast(`${IC.check} +10 picks added.`); }
+      if (r && r.ok) { S.pica10 = true; save(); serverRightsLeft = r.rightsLeftToday; actHint(); closeSheet(); toast(`${IC.check} +10 swipes added.`); }
       else if (r && r.reason === 'already') { S.pica10 = true; save(); toast('Perk already used.'); }
       else { toast('Could not add swipes - try again.'); }
     });
