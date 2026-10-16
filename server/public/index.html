@@ -75,6 +75,10 @@ img{display:block}
 .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;min-height:0}
 .heart-art{width:128px;height:116px;flex-shrink:0;color:var(--marigold);filter:drop-shadow(0 0 26px rgba(242,178,92,.28))}
 .splash .cta{width:100%}
+.sponsor-banner{display:block;width:100%;box-sizing:border-box;margin:16px 0 4px;padding:14px 12px;border:1px solid rgba(201,150,47,.6);border-radius:14px;background:rgba(255,244,232,.05);text-align:center;text-decoration:none;cursor:pointer}
+.sponsor-banner .sb-title{display:block;font-family:var(--serif);font-weight:400;font-size:19px;letter-spacing:.16em;color:var(--marigold);margin-bottom:8px;text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:1px}
+.sponsor-banner .sb-line{display:block;color:var(--on-night-soft);font-size:13px;line-height:2}
+
 .chip-night{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 13px;border-radius:99px;border:1px solid rgba(242,178,92,.35);background:rgba(255,244,232,.06);font-size:12.5px;font-weight:600;color:var(--on-night-soft);margin-top:18px}
 .chip-night i{width:8px;height:8px;border-radius:50%;background:var(--c)}
 .splash h1,.night-title{font-family:var(--serif);font-weight:400;font-size:clamp(32px,9.4vw,38px);line-height:1.08;margin-top:12px}
@@ -187,6 +191,7 @@ img{display:block}
 .head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 18px 10px;min-height:62px;flex-shrink:0}
 .head .mark{width:30px;height:30px}
 .head h1{font-family:var(--serif);font-weight:400;font-size:28px;color:var(--wine);line-height:1}
+.head h1 .sponsor-h1{color:var(--gold);opacity:.85;letter-spacing:.05em;font-size:19px;white-space:nowrap}
 .tonight{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:99px;background:var(--paper);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink-2);white-space:nowrap}
 .tonight i{width:8px;height:8px;border-radius:50%;background:var(--c)}
 .icon-btn{width:40px;height:40px;border-radius:50%;background:var(--paper);border:1px solid var(--line);display:grid;place-items:center;color:var(--ink-2);flex-shrink:0}
@@ -880,7 +885,13 @@ SCREENS.landing = () => {
       <h1>Find your<em>Dandiya partner.</em></h1>
       <p class="sub">See who from North Campus is going to garba, pair up and dance together.</p>
     </div>
-    <div class="cta">
+    <a class="sponsor-banner" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener">
+        <span class="sb-title">BEATS &amp; DANDIYA</span>
+        <span class="sb-line">Marina Dreams, Ashok Vihar</span>
+        <span class="sb-line">Nearest Metro: Shalimar Bagh Gate No. 4</span>
+        <span class="sb-line">6pm-12am</span>
+      </a>
+      <div class="cta">
       <button class="btn glow" id="start">${signedIn ? 'Open Dandiya Nights' : 'See who’s going'} ${IC.arrow}</button>
       ${signedIn ? '' : '<button class="text-btn full" id="login">Already have a profile? <b>Log in</b></button>'}
     </div></section>`;
@@ -1785,7 +1796,7 @@ let lb = {board: null, period: 'tonight', prev: {}, timer: null};
 async function renderBoard() {
   lb.board ??= myBoardKey();
   app.innerHTML = `${demoFlag()}<section class="screen app">
-    <header class="head"><h1>${lb.board === 'queen' ? CONFIG.BOARD_NAME.female : CONFIG.BOARD_NAME.male}</h1>${tonightChip()}</header>
+    <header class="head"><h1>${lb.board === 'queen' ? CONFIG.BOARD_NAME.female : '<span class="sponsor-h1">BEATS &amp; DANDIYA</span>'}</h1>${tonightChip()}</header>
     <div class="seg" role="group" aria-label="Board"><button data-b="queen" aria-pressed="${lb.board === 'queen'}">${CONFIG.BOARD_NAME.female}</button><button data-b="king" aria-pressed="${lb.board === 'king'}">${CONFIG.BOARD_NAME.male}</button></div>
     <div class="scroll pad">
       <div class="seg" role="group" aria-label="When" style="margin:0"><button data-p="tonight" aria-pressed="${lb.period === 'tonight'}">Tonight · ${esc(tonight().colour)}</button><button data-p="week" aria-pressed="${lb.period === 'week'}">All of Navratri</button></div>
