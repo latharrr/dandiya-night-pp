@@ -106,6 +106,7 @@ try { db.exec(`CREATE TABLE IF NOT EXISTS outbound_queue(id INTEGER PRIMARY KEY 
 try { db.exec(`CREATE TABLE IF NOT EXISTS wa_log(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, phone TEXT, user_id TEXT, type TEXT, status TEXT, detail TEXT)`); } catch (e) {}
 for (const col of ['identity_conflict TEXT', 'picapool_synced_at INTEGER']) { try { db.exec(`ALTER TABLE users ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
 db.exec(`CREATE TABLE IF NOT EXISTS dismissed(from_id TEXT, to_id TEXT, at INTEGER, PRIMARY KEY(from_id, to_id))`);
+db.exec(`CREATE TABLE IF NOT EXISTS ig_requests(id INTEGER PRIMARY KEY AUTOINCREMENT, from_id TEXT NOT NULL, to_id TEXT NOT NULL, at INTEGER NOT NULL, status TEXT DEFAULT 'pending', handle TEXT, answered_at INTEGER, UNIQUE(from_id, to_id))`);
 // v2.1: indexes for the lookups that run on every poll (pairs by either side, reports per person, sessions per user)
 db.exec(`CREATE INDEX IF NOT EXISTS matches_b ON matches(b);
 CREATE INDEX IF NOT EXISTS reports_to ON reports(to_id, resolved);
@@ -614,6 +615,66 @@ route('GET', '/api/likes/sent', ({req}) => {
   const sent = rows.filter(r => !blockedPair(u.id, r.to_id) && !q('SELECT 1 FROM matches WHERE a=? AND b=?').get(...[u.id, r.to_id].sort()))
     .map(r => ({person: card(r, JSON.parse(r.data)), at: r.at}));
   return {sent};
+});
+
+
+/* ---- profile sheet: one person's full card + Instagram asks (16:10) ---- */
+route('GET', '/api/person/:id', ({req, params}) => {
+  const u = authUser(req); needProfile(u);
+  hit('person:' + u.id, 3600e3, 300, 'Slow down for a minute.');
+  const t = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE u.id=? AND ${VISIBLE('p')}`).get(String(params.id || ''));
+  if (!t || t.id === u.id || blockedPair(u.id, t.id)) bad('That profile is no longer available.', 404);
+  const ig = q('SELECT * FROM ig_requests WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?)').get(u.id, t.id, t.id, u.id);
+  const liked = !!q(`SELECT 1 FROM swipes WHERE from_id=? AND to_id=? AND dir='right'`).get(u.id, t.id);
+  const m = q('SELECT id FROM matches WHERE a=? AND b=?').get(...[u.id, t.id].sort());
+  return {person: {...card(t, JSON.parse(t.data)), gender: t.gender}, liked, matchId: m ? m.id : null,
+    ig: ig ? (ig.from_id === u.id ? {dir: 'out', status: ig.status, handle: ig.status === 'shared' ? ig.handle : null} : {dir: 'in', status: ig.status, id: ig.id}) : null};
+});
+
+route('POST', '/api/ig/ask', ({req, body}) => {
+  const u = authUser(req); needProfile(u);
+  hit('igask:' + u.id, 3600e3, 30, 'Slow down - too many Instagram asks.');
+  const t = q(`SELECT u.* FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=? AND ${VISIBLE('p')}`).get(String(body.targetId || ''));
+  if (!t || t.id === u.id || blockedPair(u.id, t.id)) bad('That profile is no longer available.', 404);
+  const ex = q('SELECT * FROM ig_requests WHERE from_id=? AND to_id=?').get(u.id, t.id);
+  if (ex) {
+    if (ex.status === 'pending') return {status: 'pending'};
+    if (ex.status === 'shared') return {status: 'shared', handle: ex.handle};
+    q(`UPDATE ig_requests SET status='pending', at=?, handle=NULL, answered_at=NULL WHERE id=?`).run(now(), ex.id);
+  } else {
+    q('INSERT INTO ig_requests(from_id, to_id, at) VALUES(?,?,?)').run(u.id, t.id, now());
+  }
+  q('INSERT INTO events(ts,event,user_id,data) VALUES(?,?,?,?)').run(now(), 'ig_ask', u.id, JSON.stringify({to: t.id}));
+  return {status: 'pending'};
+});
+
+route('GET', '/api/ig/mine', ({req}) => {
+  const u = authUser(req); needProfile(u);
+  const personOf = id => { const r = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE u.id=? AND ${VISIBLE('p')}`).get(id); return r && !blockedPair(u.id, id) ? card(r, JSON.parse(r.data)) : null; };
+  const incoming = q(`SELECT * FROM ig_requests WHERE to_id=? AND status='pending' ORDER BY at DESC`).all(u.id)
+    .map(r => ({id: r.id, at: r.at, person: personOf(r.from_id)})).filter(x => x.person);
+  const outgoing = q('SELECT * FROM ig_requests WHERE from_id=? ORDER BY at DESC LIMIT 50').all(u.id)
+    .map(r => ({id: r.id, at: r.at, status: r.status, handle: r.status === 'shared' ? r.handle : null, person: personOf(r.to_id)})).filter(x => x.person);
+  return {incoming, outgoing};
+});
+
+route('POST', '/api/ig/answer', ({req, body}) => {
+  const u = authUser(req); needProfile(u);
+  const r = q('SELECT * FROM ig_requests WHERE id=?').get(+body.id || 0);
+  if (!r || r.to_id !== u.id) bad('That request is no longer available.', 404);
+  const h = String(body.handle || '').trim().replace(/^@+/, '').toLowerCase();
+  if (!/^[a-z0-9._]{1,30}$/.test(h)) bad("That doesn't look like an Instagram handle.");
+  q(`UPDATE ig_requests SET status='shared', handle=?, answered_at=? WHERE id=?`).run(h, now(), r.id);
+  q('INSERT INTO events(ts,event,user_id,data) VALUES(?,?,?,?)').run(now(), 'ig_share', u.id, JSON.stringify({to: r.from_id}));
+  return {status: 'shared'};
+});
+
+route('POST', '/api/ig/decline', ({req, body}) => {
+  const u = authUser(req); needProfile(u);
+  const r = q('SELECT * FROM ig_requests WHERE id=?').get(+body.id || 0);
+  if (!r || r.to_id !== u.id) bad('That request is no longer available.', 404);
+  q(`UPDATE ig_requests SET status='declined', answered_at=? WHERE id=?`).run(now(), r.id);
+  return {ok: true};
 });
 
 route('GET', '/api/matches', ({req}) => {

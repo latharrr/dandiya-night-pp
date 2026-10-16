@@ -1367,7 +1367,7 @@ async function renderFeed() {
   }
   if (route === 'app' && tab === 'feed') {
     drawDeck();
-    if (!myPhoto() && !S.photoAsked && !$('.sheet-bg', app) && !$('.paired', app)) { S.photoAsked = true; save(); track('photo_prompt', {when: 'arrive'}); photosSheet({first: true}); }
+    if (!myPhoto() && !S.photoAsked && !$('.sheet-bg', app) && !$('.paired', app)) { S.photoAsked = true; save(); track('photo_prompt', {when: 'arrive'}); photosSheet({first: true}); } maybeIgPrompt();
   }
 }
 function startReview() { feed.mode = 'passed'; feed.queue = []; track('review_passed'); renderFeed(); }
@@ -1711,7 +1711,7 @@ function pairedHtml() {
     const acts = CONFIG.CHAT_ENABLED
       ? `<button class="sb ${m.chatRequest === 'sent' && !m.chatId ? '' : 'pri'}" data-chat="${esc(m.id)}">${chatLabel}</button>${num || `<button class="sb" data-num="${esc(m.id)}">Swap numbers</button>`}`
       : (num || `<button class="sb pri" data-num="${esc(m.id)}">Swap numbers</button>`);
-    return `<div class="row">${photoOr(p.photos?.[0])}<div class="m"><b>${esc(p.name)}</b><small>${esc(p.college)}</small>${bothLine(p)}${note}<div class="acts">${acts}</div></div>
+    return `<div class="row"><span class="pfp" data-pid="${esc(p.id)}">${photoOr(p.photos?.[0])}</span><div class="m"><b>${esc(p.name)}</b><small>${esc(p.college)}</small>${bothLine(p)}${note}<div class="acts">${acts}</div></div>
       <button class="rmore" data-rep="${esc(p.id)}" aria-label="Report or block ${esc(p.name)}">${IC.more}</button></div>`; }).join('')}`;
 }
 function bindPaired() {
@@ -1723,9 +1723,9 @@ function bindPaired() {
 async function loadReceived() {
   let r; try { r = await api.getReceivedLikes(); } catch (e) { if ($('#pPanel')) $('#pPanel').innerHTML = `<p class="nothing">${esc(e.message)}</p>`; return; }
   if (pairsTab !== 'asked' || !$('#pPanel')) return;
-  const list = r.received || [];
+  const list = r.received || []; window._rcvList = list;
   $('#pPanel').innerHTML = list.length
-    ? `<p class="hint">They picked you. Pair up and you’re paired.</p>${list.map(({person: p, passed}) => `<div class="row">${photoOr(p.photos?.[0])}<div class="m"><b>${esc(p.name)}</b><small>${esc(p.college)}</small>${bothLine(p)}
+    ? `<p class="hint">They picked you. Pair up and you’re paired.</p>${list.map(({person: p, passed}) => `<div class="row"><span class="pfp" data-pid="${esc(p.id)}">${photoOr(p.photos?.[0])}</span><div class="m"><b>${esc(p.name)}</b><small>${esc(p.college)}</small>${bothLine(p)}
         ${passed ? '<p class="status mute">You skipped them earlier</p>' : ''}
         <div class="acts"><button class="sb pri" data-lb="${esc(p.id)}">Pair up</button><button class="sb" data-nf="${esc(p.id)}">Not for me</button></div></div>
         <button class="rmore" data-rep="${esc(p.id)}" aria-label="Report or block ${esc(p.name)}">${IC.more}</button></div>`).join('')}`
@@ -1749,9 +1749,9 @@ async function likeBack(p, btn) {
 async function loadSent() {
   let r; try { r = await api.getSentLikes(); } catch (e) { if ($('#pPanel')) $('#pPanel').innerHTML = `<p class="nothing">${esc(e.message)}</p>`; return; }
   if (pairsTab !== 'sent' || !$('#pPanel')) return;
-  const list = r.sent || [];
+  const list = r.sent || []; window._sntList = list;
   $('#pPanel').innerHTML = list.length
-    ? `<p class="hint">Waiting for them to pick you too. If they do, they move to Paired.</p>${list.map(({person: p}) => `<div class="row" style="align-items:center">${photoOr(p.photos?.[0])}<div class="m"><b>${esc(p.name)}</b><small>${esc(p.college)}</small>${bothLine(p)}</div></div>`).join('')}`
+    ? `<p class="hint">Waiting for them to pick you too. If they do, they move to Paired.</p>${list.map(({person: p}) => `<div class="row" style="align-items:center"><span class="pfp" data-pid="${esc(p.id)}">${photoOr(p.photos?.[0])}</span><div class="m"><b>${esc(p.name)}</b><small>${esc(p.college)}</small>${bothLine(p)}</div></div>`).join('')}`
     : `<div class="nothing">People you pick show up here until they pick you back.<button class="btn" data-home>Find people</button></div>`;
   toDiscover($('#pPanel'));
 }
@@ -1786,11 +1786,11 @@ async function loadBoard(silent) {
     return was > now ? `<span class="mv up" aria-label="Up ${was - now}">▲${was - now}</span>` : was < now ? `<span class="mv down" aria-label="Down ${now - was}">▼${now - was}</span>` : ''; };
   lb.prev[want] = ranks;
   if (lb.period === 'tonight' && lb.board === myBoardKey() && S.profile.inBoard) setCrown(r.me && r.me.rank ? {rank: r.me.rank, day: todayISO()} : null);
-  const top = r.top || [];
-  const pod = (p, rk) => p ? `<div class="pod p${rk}"><span class="cr">${rk === 1 ? IC.crown : ''}</span><div class="av"><img src="${esc(p.photo)}" alt=""></div><b>${esc(p.name)} ${moved(p.id)}</b><small>${esc(shortCollege(p.college))}</small><div class="base">${rk}</div></div>` : '<div></div>';
+  const top = r.top || []; window._lbTop = top;
+  const pod = (p, rk) => p ? `<div class="pod p${rk}" data-pid="${esc(p.id)}"><span class="cr">${rk === 1 ? IC.crown : ''}</span><div class="av"><img src="${esc(p.photo)}" alt=""></div><b>${esc(p.name)} ${moved(p.id)}</b><small>${esc(shortCollege(p.college))}</small><div class="base">${rk}</div></div>` : '<div></div>';
   const mine = (S.user.gender === 'female') === (lb.board === 'queen');
   $('#lbBody').innerHTML = (top.length ? `<div class="podium">${pod(top[1], 2)}${pod(top[0], 1)}${pod(top[2], 3)}</div>
-      ${top.slice(3).map((p, i) => `<div class="rk"><span class="n">${i + 4}</span><img src="${esc(p.photo)}" alt=""><span style="min-width:0"><b>${esc(p.name)} ${moved(p.id)}</b><small>${esc(p.college)}</small></span>${p.isMe ? '<span class="you">YOU</span>' : ''}</div>`).join('')}`
+      ${top.slice(3).map((p, i) => `<div class="rk" data-pid="${esc(p.id)}"><span class="n">${i + 4}</span><img src="${esc(p.photo)}" alt=""><span style="min-width:0"><b>${esc(p.name)} ${moved(p.id)}</b><small>${esc(p.college)}</small></span>${p.isMe ? '<span class="you">YOU</span>' : ''}</div>`).join('')}`
     : '<p class="nothing">No crowns yet tonight. The first picks decide it.</p>')
     + (mine ? myBoardCard(r.me) : '')
     + `<p class="note"><span class="livedot" aria-hidden="true"></span>Live · updated ${new Date().toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})}. Counts are never shown publicly.</p>`;
@@ -2297,6 +2297,186 @@ tapCard = function(el, p, e) {
   document.body.appendChild(ov);
   document.addEventListener('keydown', onkey);
 };
+</script>
+
+
+<!-- profile sheet 16:10: tap a photo anywhere (deck, pairs, board) to open the full pass: photos, plans, prompt, Pair up + Ask Instagram -->
+<style>
+.pfp{cursor:pointer;display:inline-flex}
+.pod[data-pid],.rk[data-pid]{cursor:pointer}
+.pfs{max-height:82vh;overflow-y:auto;text-align:left}
+.pfs .ph{position:relative;border-radius:14px;overflow:hidden;aspect-ratio:3/4;background:#1c1a17;cursor:zoom-in}
+.pfs .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.pfs .phnav{position:absolute;top:50%;transform:translateY(-50%);font-size:26px;color:#fff;background:rgba(0,0,0,.35);border:0;border-radius:50%;width:38px;height:38px;line-height:1;cursor:pointer;padding:0 0 3px}
+.pfs .phprev{left:8px}.pfs .phnext{right:8px}
+.pfs .phdots{position:absolute;bottom:8px;left:0;right:0;text-align:center;color:#fff;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.pfs .rel{font-size:13px;opacity:.75;margin:2px 0 6px}
+.pfs .actsrow{display:flex;gap:10px;margin-top:14px}
+.pfs .actsrow .sb{flex:1}
+.pfs .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pfs .chip{font-size:12px;border:1px solid rgba(0,0,0,.15);border-radius:999px;padding:3px 10px;opacity:.85}
+</style>
+<script>
+/* profile sheet 16:10 */
+(function(){
+const _openPhotoZoom = tapCard; /* keep the 06:46 lightbox for full-size zoom inside the sheet */
+tapCard = function(el, p, e) { openProfileSheet(p, {photo: +el.dataset.photo || 0}); };
+
+const _findPerson = id => (feed.queue || []).find(x => x.id === id)
+  || (S.matches || []).map(m => m.person).find(x => x && x.id === id)
+  || ((window._rcvList || []).map(x => x.person).find(x => x && x.id === id))
+  || ((window._sntList || []).map(x => x.person).find(x => x && x.id === id))
+  || ((window._lbTop || []).find(x => x && x.id === id)) || null;
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-pid]');
+  if (!t) return;
+  if (e.target.closest('button, a')) return; /* row buttons keep their own actions */
+  const id = t.dataset.pid; if (!id || id === 'me') return;
+  const p = _findPerson(id) || {id};
+  e.preventDefault(); e.stopPropagation();
+  openProfileSheet(p, {});
+}, true);
+
+function _personTags(p) {
+  try {
+    const pl = livePlans(p);
+    return pl.slice(0, 3).map(x => `<span class="tag">${IC.pin}${esc(x.name)} · ${esc(x.dates.map(dayLabel).join(', '))} · ${timeLabel(x.time)}</span>`).join('')
+      + (pl.length > 3 ? `<span class="tag">+${pl.length - 3} more</span>` : '');
+  } catch (e) { return ''; }
+}
+function _personChips(p) {
+  const c = [];
+  if (p.lookingFor) c.push('Looking for: ' + p.lookingFor);
+  if (p.skill) c.push(p.skill);
+  if (p.style) c.push(p.style);
+  if (p.sticks) c.push(p.sticks);
+  if (p.outfit) c.push(p.outfit);
+  if (p.knuckle) c.push(p.knuckle);
+  if (p.ride) c.push('Ride: ' + p.ride + (p.seats ? ' · ' + p.seats + ' seats' : ''));
+  return c.length ? `<div class="chips">${c.map(x => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : '';
+}
+
+async function openProfileSheet(p0, opts) {
+  if (!p0 || !p0.id) return;
+  let p = p0, liked = !!(S.swipes[p0.id] && S.swipes[p0.id].dir === 'right'),
+      match = (S.matches || []).find(m => m.person && m.person.id === p0.id) || null, ig = null, gender = p0.gender || null;
+  if (!isDemo() && S.token) {
+    try { const r = await api.req('GET', '/person/' + encodeURIComponent(p0.id));
+      p = {...p0, ...r.person}; gender = r.person.gender || gender; liked = r.liked; ig = r.ig;
+      if (r.matchId) match = (S.matches || []).find(m => m.id === r.matchId) || match;
+    } catch (e) { if (!p0.name) return toast(esc(e.message)); }
+  }
+  const photos = (p.photos && p.photos.length ? p.photos : (p.photo ? [p.photo] : []));
+  let pi = Math.min(opts.photo || 0, Math.max(0, photos.length - 1));
+  const rel = match ? `<p class="rel">${IC.heart(12)} You two are paired</p>`
+    : liked ? '<p class="rel">You picked them - waiting for them</p>'
+    : (window._rcvList || []).some(x => x.person && x.person.id === p.id) ? '<p class="rel">They picked you</p>' : '';
+  const sameGender = gender && S.user && S.user.gender && gender === S.user.gender;
+  sheet(`<div class="pfs">
+    <div class="ph" id="pfsPh">${photos.length ? `<img src="${esc(photos[pi])}" alt="${esc(p.name || '')}">` : ''}
+      ${photos.length > 1 ? `<button class="phnav phprev" aria-label="Previous photo">&#8249;</button><button class="phnav phnext" aria-label="Next photo">&#8250;</button><div class="phdots">${pi + 1} / ${photos.length}</div>` : ''}</div>
+    <h2 style="margin-top:10px">${esc(p.name || '')}<em>${esc(p.college || '')}</em></h2>
+    ${rel}
+    <div class="tags">${_personTags(p)}</div>
+    ${p.prompt && p.prompt.text ? `<div class="line"><small>${esc(promptLabel(p.prompt.id))}…</small><p>“${esc(p.prompt.text)}”</p></div>` : ''}
+    ${_personChips(p)}
+    <div class="actsrow"><button class="sb" id="pfsIg"></button>${sameGender ? '' : `<button class="sb pri" id="pfsPair"></button>`}</div>
+    <button class="text-btn" id="pfsRep" style="margin-top:6px">Report or block</button></div>`, s => {
+    const ph = $('#pfsPh', s);
+    const setPhoto = i => { pi = i; const img = ph.querySelector('img'); if (img) img.src = photos[pi]; const d = ph.querySelector('.phdots'); if (d) d.textContent = (pi + 1) + ' / ' + photos.length; };
+    const pv = ph.querySelector('.phprev'), nx = ph.querySelector('.phnext');
+    if (pv) pv.onclick = e => { e.stopPropagation(); setPhoto(Math.max(pi - 1, 0)); };
+    if (nx) nx.onclick = e => { e.stopPropagation(); setPhoto(Math.min(pi + 1, photos.length - 1)); };
+    if (photos.length) ph.addEventListener('click', e => { if (e.target.closest('.phnav')) return; _openPhotoZoom({dataset: {photo: String(pi)}}, {photos}, e); });
+    $('#pfsRep', s).onclick = () => openReport(p);
+    const igBtn = $('#pfsIg', s), pairBtn = $('#pfsPair', s);
+    const paintIg = () => {
+      igBtn.disabled = false; igBtn.textContent = 'Ask Instagram'; igBtn.onclick = null;
+      if (ig && ig.dir === 'out' && ig.status === 'pending') { igBtn.disabled = true; igBtn.textContent = 'Asked for Instagram ✓'; return; }
+      if (ig && ig.dir === 'out' && ig.status === 'shared' && ig.handle) { igBtn.textContent = '📷 @' + ig.handle; igBtn.onclick = () => window.open('https://instagram.com/' + encodeURIComponent(ig.handle), '_blank', 'noopener'); return; }
+      if (ig && ig.dir === 'out' && ig.status === 'declined') { igBtn.textContent = 'Ask Instagram again'; }
+      if (ig && ig.dir === 'in' && ig.status === 'pending') { igBtn.textContent = 'They asked for yours'; igBtn.onclick = () => igAnswerSheet(ig.id, p, paintIg); return; }
+      if (ig && ig.dir === 'in' && ig.status === 'shared') { igBtn.disabled = true; igBtn.textContent = 'You shared yours'; return; }
+      igBtn.onclick = async () => {
+        igBtn.disabled = true;
+        if (isDemo()) { ig = {dir: 'out', status: 'pending'}; paintIg(); return; }
+        try { const r = await api.req('POST', '/ig/ask', {targetId: p.id}); ig = {dir: 'out', status: r.status, handle: r.handle || null}; track('ig_ask'); }
+        catch (e) { toast(esc(e.message)); igBtn.disabled = false; return; }
+        paintIg();
+      };
+    };
+    paintIg();
+    if (pairBtn) {
+      if (match) { pairBtn.textContent = 'Say hi'; pairBtn.onclick = () => { closeSheet(); chatFlow(match); }; }
+      else if (liked) { pairBtn.disabled = true; pairBtn.textContent = 'Picked ✓'; }
+      else { pairBtn.textContent = 'Pair up'; pairBtn.onclick = () => doPairFromSheet(p, pairBtn); }
+    }
+  });
+}
+window.openProfileSheet = openProfileSheet;
+
+async function doPairFromSheet(p, btn) {
+  if (rightsLeft() <= 0) return limitSheet();
+  btn.disabled = true;
+  let r; try { r = await api.swipe(p.id, 'right'); }
+  catch (e) { btn.disabled = false; return toast(esc(e.message)); }
+  S.swipes[p.id] = {dir: 'right', at: Date.now(), retried: !!S.swipes[p.id]}; S.rightsByDay[todayISO()] = (S.rightsByDay[todayISO()] || 0) + 1;
+  if (typeof r.rightsLeftToday === 'number' && !isDemo()) { serverRightsLeft = r.rightsLeftToday; serverRightsNextAt = r.rightsNextAt || serverRightsNextAt; }
+  feed.queue = (feed.queue || []).filter(x => x.id !== p.id); save(); track('like_back', {from: 'profile'});
+  if (r.match) { S.matches = [r.match, ...S.matches.filter(m => m.id !== r.match.id)]; save(); track('match', {from: 'profile'}); closeSheet(); showMatch(r.match); return; }
+  closeSheet(); if (route === 'app' && tab === 'feed') drawDeck(); else if (route === 'app' && tab === 'pairs') renderPairs();
+}
+
+function igAnswerSheet(reqId, person, done) {
+  sheet(`<h2>Share your Instagram?<em>${esc(person.name)} asked</em></h2>
+    <div class="duo">${photoOr((person.photos && person.photos[0]) || person.photo)}</div>
+    <p class="p">Only your handle is shared - they see @yourname and can follow you. Nothing is posted.</p>
+    <input class="in" id="igH" type="text" autocomplete="off" placeholder="your.instagram" maxlength="30" style="width:100%;margin:8px 0">
+    <button class="btn" id="igShare" data-autofocus>Share Instagram</button>
+    <button class="text-btn" id="igNo">Not now</button>`, s => {
+    const inp = $('#igH', s);
+    $('#igShare', s).onclick = async () => {
+      const h = inp.value.trim().replace(/^@+/, '');
+      if (!/^[A-Za-z0-9._]{1,30}$/.test(h)) return toast('That doesn’t look like an Instagram handle.');
+      $('#igShare', s).disabled = true;
+      if (!isDemo()) { try { await api.req('POST', '/ig/answer', {id: reqId, handle: h}); } catch (e) { $('#igShare', s).disabled = false; return toast(esc(e.message)); } }
+      (S.igAnswered = S.igAnswered || []).push(reqId); save(); track('ig_share');
+      closeSheet(); toast('Shared @' + h.toLowerCase() + ' with ' + person.name + '.'); done && done();
+    };
+    $('#igNo', s).onclick = async () => {
+      if (!isDemo()) { try { await api.req('POST', '/ig/decline', {id: reqId}); } catch (e) {} }
+      (S.igAnswered = S.igAnswered || []).push(reqId); save(); track('ig_decline');
+      closeSheet(); done && done();
+    };
+  });
+}
+window.igAnswerSheet = igAnswerSheet;
+
+let _igBusy = false;
+async function maybeIgPrompt() {
+  if (_igBusy || isDemo() || !S.token || route !== 'app' || tab !== 'feed' || $('.sheet-bg', app) || $('.paired', app)) return;
+  _igBusy = true;
+  try {
+    const r = await api.req('GET', '/ig/mine');
+    const seen = new Set(S.igAnswered || []);
+    const inc = (r.incoming || []).find(x => !seen.has(x.id));
+    if (inc) { track('ig_prompt', {kind: 'ask'}); return igAnswerSheet(inc.id, inc.person, () => {}); }
+    const seenShared = new Set(S.igSeenShared || []);
+    const sh = (r.outgoing || []).find(x => x.status === 'shared' && x.handle && !seenShared.has(x.id));
+    if (sh) {
+      (S.igSeenShared = S.igSeenShared || []).push(sh.id); save(); track('ig_prompt', {kind: 'shared'});
+      sheet(`<h2>${esc(sh.person.name)} shared their Instagram<em>📷 @${esc(sh.handle)}</em></h2>
+        <div class="duo">${photoOr(sh.person.photos && sh.person.photos[0])}</div>
+        <button class="btn" id="igOpen" data-autofocus>Open Instagram</button><button class="text-btn" id="igOk">Later</button>`, s => {
+        $('#igOpen', s).onclick = () => window.open('https://instagram.com/' + encodeURIComponent(sh.handle), '_blank', 'noopener');
+        $('#igOk', s).onclick = () => closeSheet();
+      });
+    }
+  } catch (e) {} finally { _igBusy = false; }
+}
+window.maybeIgPrompt = maybeIgPrompt;
+})();
 </script>
 
 </body>
