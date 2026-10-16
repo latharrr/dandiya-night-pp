@@ -996,7 +996,7 @@ route('GET', '/api/admin/outbound-queue', async ({ req, url }) => {
 });
 const CAPPED131026_MS = 3 * 86400000; // 72h marketing-cap cooldown (Meta per-recipient 131026)
 function capped131026(phone) {
-  try { const p10 = String(phone || '').replace(/\D/g, '').slice(-10); if (!p10) return false; const r = q(`SELECT ts FROM wa_log WHERE phone LIKE ? AND status='failed' AND detail LIKE '%131026%' AND ts > ? ORDER BY ts DESC LIMIT 1`).get('%' + p10, now() - CAPPED131026_MS); return !!r; } catch (e) { return false; }
+  try { const p10 = String(phone || '').replace(/\D/g, '').slice(-10); if (!p10) return false; const r = q(`SELECT ts FROM wa_log WHERE phone LIKE ? AND status='failed' AND detail LIKE '%131026%' AND ts > ? AND LENGTH(phone) <= 12 ORDER BY ts DESC LIMIT 1`).get('%' + p10, now() - CAPPED131026_MS); return !!r; } catch (e) { return false; }
 }
 async function conflictNotice(u, kind) {
   try {
