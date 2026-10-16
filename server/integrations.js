@@ -43,7 +43,7 @@ async function post(url, headers, body) {
   return {ok: res.ok, status: res.status, json, text: text.slice(0, 300)};
 }
 /* one WhatsApp template message. `body` fills {{1}}, {{2}}…; `button` fills a URL/copy-code button's variable */
-async function waTemplate(phone, name, lang, body = [], button = null) {
+async function waTemplateInner(phone, name, lang, body = [], button = null) {
   const components = [];
   if (body.length) components.push({type: 'body', parameters: body.map(t => ({type: 'text', text: String(t)}))});
   if (button !== null) components.push({type: 'button', sub_type: 'url', index: '0', parameters: [{type: 'text', text: String(button)}]});
@@ -61,7 +61,36 @@ async function sendSms(phone, code) {
 }
 const fill = (v, to, other) => ({name: other.first_name, me: to.first_name, college: other.college, link: APP_URL}[v] ?? '');
 
+
+let waHooks = {};
+function setWaHooks(h) { waHooks = h || {}; }
+async function waTemplate(phone, name, lang, body = [], button = null, waType = 'template', waSkipGate = false) {
+  if (!waSkipGate && waHooks.gate) {
+    const g = waHooks.gate(phone);
+    if (!g.ok) { if (waHooks.log) waHooks.log(phone, waType, 'gated:' + g.why, String(name)); return { gated: g.why }; }
+  }
+  try {
+    const r = await waTemplateInner(phone, name, lang, body, button);
+    if (waHooks.log) waHooks.log(phone, waType, 'sent', String(name));
+    return r;
+  } catch (e) {
+    if (waHooks.log) waHooks.log(phone, waType, 'failed:' + String(e && e.message || e).slice(0, 120), String(name));
+    throw e;
+  }
+}
+async function waText(phone, text, type) {
+  const t = type || 'freeform';
+  if (waHooks.gate) {
+    const g = waHooks.gate(phone);
+    if (!g.ok) { if (waHooks.log) waHooks.log(phone, t, 'gated:' + g.why, String(text).slice(0, 80)); return { gated: g.why }; }
+  }
+  const r = await post(`${WA.base}/${WA.version}/${WA.phoneId}/messages`, { Authorization: `Bearer ${WA.token}` }, { messaging_product: 'whatsapp', to: '91' + phone, type: 'text', text: { body: String(text).slice(0, 1000) } });
+  if (waHooks.log) waHooks.log(phone, t, r && r.ok ? 'sent' : 'failed:' + (r && r.status), String(text).slice(0, 80));
+  return r;
+}
 module.exports = {
+  waText,
+  setWaHooks,
   waTemplate,
   /** Which ways a login code can go out right now: ['whatsapp', 'sms'] in the order they are tried. */
   otpChannels() { return CHANNELS.filter(ready); },
@@ -81,7 +110,7 @@ module.exports = {
     let last;
     for (const c of order) {
       try {
-        if (c === 'whatsapp') await waTemplate(phone, WA.otpTemplate, WA.otpLang, [code], WA.otpButton ? code : null);
+        if (c === 'whatsapp') await waTemplate(phone, WA.otpTemplate, WA.otpLang, [code], WA.otpButton ? code : null, 'otp', true);
         else await sendSms(phone, code);
         return c;
       } catch (e) { last = e; console.error(`[otp] ${c} failed for +91${phone.slice(0, 2)}xxxxxx${phone.slice(8)}:`, e.message); }

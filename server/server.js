@@ -100,9 +100,10 @@ try { db.prepare('ALTER TABLE users ADD COLUMN feedback_done INTEGER DEFAULT 0')
 // build j: a match can hold one pending message request (sender has Picapool, the other person doesn't yet)
 for (const col of ['req_by TEXT', 'req_opener TEXT', 'req_at INTEGER']) { try { db.exec(`ALTER TABLE matches ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
 // build k: identity sync with Picapool, and "Not for me" on likes you received
+for (const col of ['wa_muted INTEGER DEFAULT 0', 'last_wa_inbound INTEGER']) { try { db.exec(`ALTER TABLE users ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
+try { db.exec(`CREATE TABLE IF NOT EXISTS outbound_queue(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, phone TEXT, kind TEXT, body TEXT, status TEXT DEFAULT 'pending', reason TEXT, created_at INTEGER, sent_at INTEGER)`); } catch (e) {}
+try { db.exec(`CREATE TABLE IF NOT EXISTS wa_log(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, phone TEXT, user_id TEXT, type TEXT, status TEXT, detail TEXT)`); } catch (e) {}
 for (const col of ['identity_conflict TEXT', 'picapool_synced_at INTEGER']) { try { db.exec(`ALTER TABLE users ADD COLUMN ${col}`); } catch (e) { /* already there */ } }
-// v3: who someone wants to dance with: 'male' | 'female' | 'everyone' (empty = the other gender, as before)
-try { db.exec('ALTER TABLE users ADD COLUMN pref TEXT'); } catch (e) { /* already there */ }
 db.exec(`CREATE TABLE IF NOT EXISTS dismissed(from_id TEXT, to_id TEXT, at INTEGER, PRIMARY KEY(from_id, to_id))`);
 // v2.1: indexes for the lookups that run on every poll (pairs by either side, reports per person, sessions per user)
 db.exec(`CREATE INDEX IF NOT EXISTS matches_b ON matches(b);
@@ -151,12 +152,7 @@ function cleanPlans(list) {
 const plansOf = p => Array.isArray(p?.plans) ? p.plans : [];
 const datesOf = p => [...new Set(plansOf(p).flatMap(x => x.dates))].sort();
 
-/* Gender preference. Two people see each other only when each is someone the other wants to dance with. */
-const PREFS = ['male', 'female', 'everyone'];
-const prefOf = u => PREFS.includes(u?.pref) ? u.pref : (u?.gender === 'female' ? 'male' : u?.gender === 'male' ? 'female' : null);
-const wants = (a, b) => { const p = prefOf(a); return p === 'everyone' || p === b.gender; };
-const mutual = (a, b) => !!a.gender && !!b.gender && wants(a, b) && wants(b, a);
-function userJson(u) { return u ? {id: u.id, firstName: u.first_name || '', gender: u.gender || null, pref: u.gender ? prefOf(u) : null, college: u.college || '', adult: !!u.adult, hasPicapool: !!u.picapool_id} : null; }
+function userJson(u) { return u ? {id: u.id, firstName: u.first_name || '', gender: u.gender || null, college: u.college || '', adult: !!u.adult, hasPicapool: !!u.picapool_id} : null; }
 function profileOf(userId) { const r = q('SELECT data FROM profiles WHERE user_id=?').get(userId); return r ? JSON.parse(r.data) : null; }
 function card(u, p) {
   return {id: u.id, name: u.first_name, college: u.college, photos: p.photos, plans: plansOf(p), lookingFor: p.lookingFor, skill: p.skill,
@@ -174,7 +170,7 @@ function readBody(req, limit) {
   return new Promise((resolve, reject) => {
     let size = 0; const chunks = [];
     req.on('data', c => { size += c.length; if (size > limit) { reject(new HttpError(413, 'That upload is too big. Try smaller photos.')); req.destroy(); } else chunks.push(c); });
-    req.on('end', () => { const raw = Buffer.concat(chunks).toString('utf8'); if (!raw) return resolve({}); try { resolve(JSON.parse(raw)); } catch (e) { reject(new HttpError(400, 'Bad request.')); } });
+    req.on('end', () => { const raw = Buffer.concat(chunks).toString('utf8'); req.rawBody = raw; if (!raw) return resolve({}); try { resolve(JSON.parse(raw)); } catch (e) { reject(new HttpError(400, 'Bad request.')); } });
     req.on('error', reject);
   });
 }
@@ -236,26 +232,21 @@ route('GET', '/api/stats', ({req, url}) => {
 let previewCache = {};
 const SAMPLES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'samples.json'), 'utf8')); } catch (e) { return {female: [], male: []}; } })();
 route('GET', '/api/preview', ({url}) => {
-  // gender = who to show (male | female | everyone); me = the viewer's own gender, if known: then only people who'd want to dance with them
-  const gp = url.searchParams.get('gender'), gender = PREFS.includes(gp) ? gp : 'female', genders = gender === 'everyone' ? ['female', 'male'] : [gender];
-  const meG = ENUMS.gender.includes(url.searchParams.get('me')) ? url.searchParams.get('me') : null, viewer = meG ? {gender: meG, pref: gender} : null;
-  const key = gender + ':' + (meG || '') + ':' + istDay();
+  const gender = url.searchParams.get('gender') === 'male' ? 'male' : 'female';
+  const key = gender + ':' + istDay();
   const c = previewCache[key]; if (c && now() - c.at < C.PREVIEW_CACHE_MS) return c.body;
-  const rows = q(`SELECT u.id, u.first_name, u.college, u.gender, u.pref, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1`).all()
-    .filter(r => genders.includes(r.gender) && (!viewer || mutual(viewer, r)));
+  const rows = q(`SELECT u.id, u.first_name, u.college, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1 AND u.gender=?`).all(gender);
   const eligible = rows.map(r => ({r, p: JSON.parse(r.data)}));
-  const order = genders.flatMap(g => [...rankBoard(g, 'tonight')]).concat(genders.flatMap(g => rankBoard(g, 'week'))).map(x => x.id);
+  const order = [...rankBoard(gender, 'tonight'), ...rankBoard(gender, 'week')].map(x => x.id);
   const pos = id => { const i = order.indexOf(id); return i < 0 ? Infinity : i; };
   const rest = shuffle(eligible.filter(({r}) => pos(r.id) === Infinity), key);
   let list = [...eligible.filter(({r}) => pos(r.id) < Infinity).sort((a, b) => pos(a.r.id) - pos(b.r.id)), ...rest];
   list = list.slice(0, C.PREVIEW_MAX).map(({r, p}) => ({id: r.id, name: r.first_name, college: r.college, dates: datesOf(p), prompt: p.prompt || null, photo: p.photos[0]}));
   if (C.SAMPLE_PROFILES && list.length < C.PREVIEW_MAX) {
     const today = istDay(), upcoming = DATES.filter(d => d >= today);
-    const pool = genders.length > 1 ? (SAMPLES.female || []).flatMap((x, i) => [[x, 'female', i], ...((SAMPLES.male || [])[i] ? [[SAMPLES.male[i], 'male', i]] : [])])
-      : (SAMPLES[gender] || []).map((x, i) => [x, gender, i]);
-    const fill = pool.slice(0, C.PREVIEW_MAX - list.length).map(([x, g, i]) => {
+    const fill = (SAMPLES[gender] || []).slice(0, C.PREVIEW_MAX - list.length).map((x, i) => {
       const ds = upcoming.filter((_, k) => (k + i) % 2 === 0).slice(0, 2);
-      return {id: `sample-${g[0]}${i + 1}`, name: x.name, college: x.college, dates: ds.length ? ds : upcoming.slice(0, 1), prompt: x.line ? {id: 'flag', text: x.line} : null, photo: x.photo, sample: true};
+      return {id: `sample-${gender[0]}${i + 1}`, name: x.name, college: x.college, dates: ds.length ? ds : upcoming.slice(0, 1), prompt: x.line ? {id: 'flag', text: x.line} : null, photo: x.photo, sample: true};
     });
     list = [...list, ...fill];
   }
@@ -265,6 +256,16 @@ route('GET', '/api/preview', ({url}) => {
   return body;
 });
 
+
+const metaGet = k => { const r = q('SELECT v FROM meta WHERE k=?').get(k); return r ? r.v : null; };
+const metaSet = (k, v) => q('INSERT INTO meta(k, v) VALUES(?, ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').run(k, String(v));
+const waGate = phone => {
+  if (metaGet('wa_master') === 'off') return { ok: false, why: 'master-off' };
+  if (phone) { const u = q('SELECT wa_muted FROM users WHERE phone=?').get(String(phone)); if (u && u.wa_muted) return { ok: false, why: 'muted' }; }
+  return { ok: true };
+};
+const waLog = (phone, type, status, detail) => { try { const u = phone ? q('SELECT id FROM users WHERE phone=?').get(String(phone)) : null; q('INSERT INTO wa_log(ts, phone, user_id, type, status, detail) VALUES(?,?,?,?,?,?)').run(now(), String(phone || ''), u ? u.id : null, String(type), String(status), String(detail || '').slice(0, 300)); } catch (e) {} };
+integrations.setWaHooks({ gate: waGate, log: waLog });
 route('POST', '/api/auth/otp', async ({req, body}) => {
   const phone = String(body.phone || '');
   if (!/^[6-9]\d{9}$/.test(phone)) bad('Enter your 10-digit WhatsApp number.');
@@ -278,7 +279,7 @@ route('POST', '/api/auth/otp', async ({req, body}) => {
   if (count >= 5) bad('Too many codes. Try again in an hour.', 429);
   const code = C.DEV_OTP || String(crypto.randomInt(0, 10 ** C.OTP_LENGTH)).padStart(C.OTP_LENGTH, '0');
   const prefer = ['sms', 'whatsapp'].includes(body.channel) ? body.channel : null;
-  let via; try { via = await integrations.sendOtp(phone, code, prefer); } catch (e) { console.error('[otp] send failed', e.message); bad("Couldn't send the code. Try again in a minute.", 502); }
+  let via; try { via = await integrations.sendOtp(phone, code, prefer); waLog(phone, 'otp', 'sent', via); } catch (e) { console.error('[otp] send failed', e.message); bad("Couldn't send the code. Try again in a minute.", 502); }
   q(`INSERT INTO otps(phone, code_hash, expires_at, attempts, last_sent, window_start, window_count) VALUES(?,?,?,?,?,?,?)
      ON CONFLICT(phone) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at, attempts=0, last_sent=excluded.last_sent, window_start=excluded.window_start, window_count=excluded.window_count`)
     .run(phone, sha(phone + ':' + code), t + C.OTP_TTL_MS, 0, t, windowStart, count + 1);
@@ -385,34 +386,11 @@ route('POST', '/api/account', async ({req, body}) => {
   const college = clean(body.college, 60); if (college.length < 2) bad('Pick your college.');
   if (gender === 'male' && WOMEN_ONLY_COLLEGES.includes(college.toLowerCase())) bad('Pick your college.');
   if (body.adult !== true) bad('This is for 18+ only.');
-  const pref = PREFS.includes(body.pref) ? body.pref : (u.pref || null);
   let picapoolId = u.picapool_id;
   if (!picapoolId) { try { picapoolId = await integrations.createPicapoolAccount({phone: u.phone, firstName, gender, college, ref: u.ref}); } catch (e) { console.error('[createPicapoolAccount]', e.message); } }
-  q('UPDATE users SET first_name=?, gender=?, pref=?, college=?, adult=1, picapool_id=?, completed_at=COALESCE(completed_at, ?) WHERE id=?')
-    .run(firstName, gender, pref, college, picapoolId ? String(picapoolId) : null, now(), u.id);
+  q('UPDATE users SET first_name=?, gender=?, college=?, adult=1, picapool_id=?, completed_at=COALESCE(completed_at, ?) WHERE id=?')
+    .run(firstName, gender, college, picapoolId ? String(picapoolId) : null, now(), u.id);
   if (picapoolId && !u.picapool_id) deliverRequests(u.id).catch(e => console.error('[deliverRequests]', e.message));
-  return {user: userJson(q('SELECT * FROM users WHERE id=?').get(u.id))};
-});
-
-/* Change "I'm a guy / girl" and/or "who I want to dance with" from the profile.
-   A new gender clears picks, pairs and "not for me" (both directions): they were made as the other side. Photos, events and the line stay.
-   A new preference alone keeps everything. Gender can't change while linked to Picapool (its gender wins there). */
-route('POST', '/api/account/gender', ({req, body}) => {
-  const u = authUser(req); needComplete(u);
-  const gender = body.gender === undefined ? u.gender : body.gender, pref = body.pref === undefined ? (u.pref || null) : body.pref;
-  if (!ENUMS.gender.includes(gender)) bad('Pick Girl or Guy.');
-  if (pref !== null && !PREFS.includes(pref)) bad('Pick who you want to dance with.');
-  if (pref !== u.pref) q('UPDATE users SET pref=? WHERE id=?').run(pref, u.id);
-  if (gender === u.gender) { bustCaches(); return {user: userJson(q('SELECT * FROM users WHERE id=?').get(u.id))}; }
-  if (u.picapool_id && u.gender) bad('Your gender comes from your Picapool account. Change it in the Picapool app.', 409);
-  if (gender === 'male' && WOMEN_ONLY_COLLEGES.includes(String(u.college || '').toLowerCase())) bad('Pick a co-ed college first (Profile → College), then switch.');
-  tx(() => {
-    q('UPDATE users SET gender=? WHERE id=?').run(gender, u.id);
-    q('DELETE FROM swipes WHERE from_id=? OR to_id=?').run(u.id, u.id);
-    q('DELETE FROM matches WHERE a=? OR b=?').run(u.id, u.id);
-    q('DELETE FROM dismissed WHERE from_id=? OR to_id=?').run(u.id, u.id);
-  });
-  bustCaches();
   return {user: userJson(q('SELECT * FROM users WHERE id=?').get(u.id))};
 });
 
@@ -523,7 +501,7 @@ route('GET', '/api/feed', ({req, url}) => {
   const t = now();
   const swiped = new Map(q('SELECT to_id, dir, at, retried FROM swipes WHERE from_id=?').all(u.id).map(r => [r.to_id, r]));
   const blocked = new Set(q('SELECT to_id x FROM blocks WHERE from_id=? UNION SELECT from_id x FROM blocks WHERE to_id=?').all(u.id, u.id).map(r => r.x));
-  const rows = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.adult=1 AND u.id<>?`).all(u.id).filter(r => mutual(u, r));
+  const rows = q(`SELECT u.*, p.data FROM profiles p JOIN users u ON u.id=p.user_id WHERE ${VISIBLE('p')} AND u.gender=? AND u.adult=1 AND u.id<>?`).all(u.gender === 'female' ? 'male' : 'female', u.id);
   let list = [];
   for (const r of rows) {
     if (blocked.has(r.id)) continue;
@@ -564,7 +542,7 @@ route('POST', '/api/swipe', async ({req, body}) => {
   const u = authUser(req); needProfile(u);
   const dir = body.dir === 'right' ? 'right' : body.dir === 'left' ? 'left' : bad('Bad swipe.');
   const target = q(`SELECT u.* FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=? AND ${VISIBLE('p')}`).get(String(body.targetId || ''));
-  if (!target || target.id === u.id || !mutual(u, target)) bad('That profile is no longer available.', 404);
+  if (!target || target.id === u.id || target.gender === u.gender) bad('That profile is no longer available.', 404);
   if (blockedPair(u.id, target.id)) bad('That profile is no longer available.', 404);
   const prev = q('SELECT * FROM swipes WHERE from_id=? AND to_id=?').get(u.id, target.id);
   if (prev && prev.dir === 'right') return {match: null, rightsLeftToday: rightsLeftToday(u.id)};
@@ -597,7 +575,7 @@ route('GET', '/api/likes/received', ({req}) => {
      WHERE s.to_id=? AND s.dir='right' AND (mine.dir IS NULL OR mine.dir<>'right')
        AND NOT EXISTS (SELECT 1 FROM dismissed d WHERE d.from_id=? AND d.to_id=s.from_id)
      ORDER BY s.at DESC`).all(u.id, u.id, u.id);
-  return {received: rows.filter(r => !blockedPair(u.id, r.from_id) && mutual(u, r)).map(r => ({person: card(r, JSON.parse(r.data)), at: r.at, passed: r.mydir === 'left'}))};
+  return {received: rows.filter(r => !blockedPair(u.id, r.from_id)).map(r => ({person: card(r, JSON.parse(r.data)), at: r.at, passed: r.mydir === 'left'}))};
 });
 route('POST', '/api/likes/dismiss', ({req, body}) => {
   const u = authUser(req); needProfile(u);
@@ -837,12 +815,176 @@ route('POST', '/api/events', ({req, body}) => {
   return null;
 }, {limit: 4e3});
 
+
+/* ------- WhatsApp admin: master toggle, mutes, nudges, broadcasts, logs (2026-10-16 batch) ------- */
+route('GET', '/api/wa-webhook', async ({ url, res }) => {
+  if (url.searchParams.get('hub.mode') === 'subscribe' && url.searchParams.get('hub.verify_token') === (process.env.WHATSAPP_VERIFY_TOKEN || '')) {
+    res.writeHead(200, { 'content-type': 'text/plain' }); res.end(url.searchParams.get('hub.challenge') || ''); return undefined;
+  }
+  res.writeHead(403); res.end('nope'); return undefined;
+});
+route('POST', '/api/wa-webhook', async ({ req, body }) => {
+  const _sec = process.env.WHATSAPP_APP_SECRET;
+  if (_sec) {
+    const crypto = require('crypto');
+    const _sig = String((req.headers && req.headers['x-hub-signature-256']) || '');
+    const _exp = 'sha256=' + crypto.createHmac('sha256', _sec).update(req.rawBody || '', 'utf8').digest('hex');
+    if (_sig.length !== _exp.length || !crypto.timingSafeEqual(Buffer.from(_sig), Buffer.from(_exp))) bad('Bad signature.', 403);
+  }
+  try {
+    const msgs = body && body.entry ? body.entry.flatMap(e => (e.changes || []).flatMap(c => { const v = c.value || {}; return (v.messages || []).map(m => ({ from: m.from, ts: Number(m.timestamp) * 1000 })); })) : [];
+    for (const m of msgs) {
+      const ph = String(m.from || '').replace(/^91/, '');
+      if (/^[6-9]\d{9}$/.test(ph)) q('UPDATE users SET last_wa_inbound=? WHERE phone=?').run(m.ts || now(), ph);
+    }
+      const stats = (body.entry || []).flatMap(e => (e.changes || []).flatMap(c => ((c.value || {}).statuses || []).map(s => ({ id: s.id, st: s.status, to: s.recipient_id }))));
+      for (const s of stats) { try { waLog(String(s.to || '-'), 'status', String(s.st || ''), String(s.id || '')); } catch (e) {} }
+  } catch (e) {}
+  return { ok: true };
+});
+
+route('GET', '/api/admin/wa-state', async ({ req, url }) => { admin(req, url); return { master: metaGet('wa_master') === 'off' ? 'off' : 'on' }; });
+route('POST', '/api/admin/wa-master', async ({ req, url, body }) => {
+  admin(req, url);
+  const on = body && body.on !== false && body.on !== 'false';
+  metaSet('wa_master', on ? 'on' : 'off');
+  waLog('-', 'admin', 'wa-master-' + (on ? 'on' : 'off'), 'admin panel');
+  return { master: on ? 'on' : 'off' };
+});
+route('POST', '/api/admin/wa-mute', async ({ req, url, body }) => {
+  admin(req, url);
+  q('UPDATE users SET wa_muted=? WHERE id=?').run(body.muted ? 1 : 0, body.userId);
+  const u = q('SELECT phone, first_name FROM users WHERE id=?').get(body.userId);
+  waLog(u ? u.phone : String(body.userId), 'admin', 'wa-mute-' + (body.muted ? 'on' : 'off'), u ? u.first_name : '');
+  return { ok: true, muted: !!body.muted };
+});
+const noPhotoUsers = () => q(`SELECT u.id, u.phone, u.first_name, u.last_wa_inbound FROM users u LEFT JOIN profiles p ON p.user_id = u.id
+  WHERE u.completed_at IS NOT NULL AND u.wa_muted = 0 AND (p.user_id IS NULL OR json_array_length(COALESCE(json_extract(p.data, '$.photos'), '[]')) = 0)`).all();
+route('GET', '/api/admin/no-photo-users', async ({ req, url }) => { admin(req, url); const rows = noPhotoUsers(); return { count: rows.length, users: rows.map(u => ({ id: u.id, name: u.first_name })) }; });
+route('POST', '/api/admin/nudge-nophoto', async ({ req, url }) => {
+  admin(req, url);
+  const rows = noPhotoUsers();
+  const base = process.env.APP_URL || 'https://dandiya.picapool.tech';
+  let sentNow = 0, queued = 0, gated = 0, failed = 0;
+  for (const u of rows) {
+    const text = `Hi ${u.first_name}! Your Dandiya Night profile is live but has no photo - profiles with photos get way more matches. Add yours here: ${base}`;
+    if (u.last_wa_inbound && now() - u.last_wa_inbound < 86400000) {
+      const r = await integrations.waText(u.phone, text, 'nudge');
+      if (r && r.gated) gated++; else if (r && r.ok) sentNow++; else failed++;
+      await new Promise(r2 => setTimeout(r2, 250));
+    } else {
+      q('INSERT INTO outbound_queue(user_id, phone, kind, body, reason, created_at) VALUES(?,?,?,?,?,?)').run(u.id, u.phone, 'nudge', text, 'awaiting-template', now());
+      waLog(u.phone, 'nudge', 'queued', 'awaiting template approval');
+      queued++;
+    }
+  }
+  return { ok: true, sentNow, queued, gated, total: rows.length, message: `nudged ${sentNow} now, ${queued} queued for template approval${gated ? `, ${gated} gated (master off)` : ''}${failed ? `, ${failed} failed` : ''}` };
+});
+route('GET', '/api/admin/broadcast-preview', async ({ req, url }) => {
+  admin(req, url);
+  const rows = q(`SELECT u.id, u.phone, u.first_name, u.last_wa_inbound FROM users u WHERE u.completed_at IS NOT NULL AND u.wa_muted = 0`).all();
+  const inWindow = rows.filter(u => u.last_wa_inbound && now() - u.last_wa_inbound < 86400000).length;
+  return { total: rows.length, inWindow, queued: rows.length - inWindow };
+});
+route('POST', '/api/admin/broadcast', async ({ req, url, body }) => {
+  admin(req, url);
+  const msg = String((body && body.message) || '').slice(0, 1000);
+  if (!msg.trim()) bad('message is required');
+  const rows = q(`SELECT u.id, u.phone, u.first_name, u.last_wa_inbound FROM users u WHERE u.completed_at IS NOT NULL AND u.wa_muted = 0`).all();
+  let sentNow = 0, queued = 0, gated = 0, failed = 0;
+  for (const u of rows) {
+    const text = msg.replace(/\{\{name\}\}/g, u.first_name || 'there');
+    if (u.last_wa_inbound && now() - u.last_wa_inbound < 86400000) {
+      const r = await integrations.waText(u.phone, text, 'broadcast');
+      if (r && r.gated) gated++; else if (r && r.ok) sentNow++; else failed++;
+      await new Promise(r2 => setTimeout(r2, 250));
+    } else {
+      q('INSERT INTO outbound_queue(user_id, phone, kind, body, reason, created_at) VALUES(?,?,?,?,?,?)').run(u.id, u.phone, 'broadcast', text, 'awaiting-window', now());
+      waLog(u.phone, 'broadcast', 'queued', 'outside 24h window');
+      queued++;
+    }
+  }
+  return { ok: true, sentNow, queued, gated, message: `sent ${sentNow} now, ${queued} queued (outside 24h window)${gated ? `, ${gated} gated` : ''}${failed ? `, ${failed} failed` : ''}` };
+});
+route('GET', '/api/admin/outbound-queue', async ({ req, url }) => {
+  admin(req, url);
+  return { rows: q(`SELECT id, phone, kind, reason, created_at FROM outbound_queue WHERE status='pending' ORDER BY created_at DESC LIMIT 100`).all() };
+});
+route('POST', '/api/admin/queue-flush', async ({ req, url }) => {
+  admin(req, url);
+  const rows = q(`SELECT * FROM outbound_queue WHERE status='pending' LIMIT 50`).all();
+  let sent = 0, failed = 0, stillQueued = 0;
+  for (const r of rows) {
+    const u = q('SELECT first_name, last_wa_inbound FROM users WHERE id=?').get(r.user_id) || {};
+    let ok = false;
+    if (r.kind === 'nudge') {
+      try { const res2 = await integrations.waTemplate(r.phone, 'dandiya_photo_nudge', process.env.WHATSAPP_OTP_LANG || 'en', [u.first_name || 'there'], null, 'nudge'); ok = !!(res2 && !res2.gated); } catch (e) { ok = false; }
+    } else {
+      if (u.last_wa_inbound && now() - u.last_wa_inbound < 86400000) {
+        const res2 = await integrations.waText(r.phone, r.body, r.kind);
+        ok = !!(res2 && res2.ok);
+      }
+    }
+    if (ok) { q(`UPDATE outbound_queue SET status='sent', sent_at=? WHERE id=?`).run(now(), r.id); sent++; }
+    else if (r.kind !== 'nudge' && !(u.last_wa_inbound && now() - u.last_wa_inbound < 86400000)) stillQueued++;
+    else { waLog(r.phone, r.kind, 'flush-failed', 'template/window'); stillQueued++; }
+    await new Promise(r2 => setTimeout(r2, 250));
+  }
+  return { ok: true, sent, stillQueued, failed };
+});
+route('GET', '/api/admin/wa-log', async ({ req, url }) => {
+  admin(req, url);
+  const uid = url.searchParams.get('user_id');
+  if (uid) {
+    return {
+      rollup: q(`SELECT type, COUNT(*) c FROM wa_log WHERE user_id=? GROUP BY type ORDER BY c DESC`).all(uid),
+      rows: q(`SELECT ts, type, status, detail FROM wa_log WHERE user_id=? ORDER BY ts DESC LIMIT 100`).all(uid)
+    };
+  }
+  return { rows: q(`SELECT ts, phone, type, status, detail FROM wa_log ORDER BY ts DESC LIMIT 300`).all() };
+});
+route('GET', '/api/admin/engagement', async ({ req, url }) => {
+  admin(req, url);
+  const uid = url.searchParams.get('user_id');
+  if (!uid) bad('user_id required');
+  const opens = q(`SELECT COUNT(*) c FROM events WHERE user_id=? AND event='app_open'`).get(uid).c;
+  const views = q(`SELECT COUNT(*) c FROM events WHERE user_id=? AND event LIKE 'view_%'`).get(uid).c;
+  const logins = q(`SELECT COUNT(*) c FROM sessions WHERE user_id=?`).get(uid).c;
+  const muted = (q('SELECT wa_muted FROM users WHERE id=?').get(uid) || { wa_muted: 0 }).wa_muted;
+  return {
+    opens, views, logins, wa_muted: muted,
+    viewsByPage: q(`SELECT event, COUNT(*) c FROM events WHERE user_id=? AND event LIKE 'view_%' GROUP BY event ORDER BY c DESC`).all(uid),
+    timeline: q(`SELECT ts, event, data FROM events WHERE user_id=? ORDER BY ts DESC LIMIT 60`).all(uid),
+    loginTimes: q(`SELECT created_at ts FROM sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 20`).all(uid)
+  };
+});
+route('GET', '/api/admin/engagement-overview', async ({ req, url }) => {
+  admin(req, url);
+  const totalUsers = q(`SELECT COUNT(*) c FROM users WHERE completed_at IS NOT NULL`).get().c || 1;
+  const totalOpens = q(`SELECT COUNT(*) c FROM events WHERE event='app_open'`).get().c;
+  const totalViews = q(`SELECT COUNT(*) c FROM events WHERE event LIKE 'view_%'`).get().c;
+  const totalLogins = q(`SELECT COUNT(*) c FROM sessions`).get().c;
+  return { users: totalUsers, totalOpens, totalViews, totalLogins, avgOpens: (totalOpens / totalUsers).toFixed(1), avgViews: (totalViews / totalUsers).toFixed(1), avgLogins: (totalLogins / totalUsers).toFixed(1) };
+});
 require('./admin2.js')({ route, admin, q, bad });
 /* ---------------- admin ---------------- */
 function admin(req, url) {
   // header only: a key in the URL ends up in logs and browser history
   if (!C.ADMIN_KEY || !same(req.headers['x-admin-key'], C.ADMIN_KEY)) bad('Wrong admin key.', 403);
 }
+
+route('GET', '/api/admin/analysis', async ({ req, url }) => {
+  admin(req, url);
+  const rows = q(`SELECT u.id user_id, u.first_name name, u.phone,
+    (SELECT COUNT(*) FROM events e WHERE e.user_id=u.id AND e.event='app_open') opens,
+    (SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id) logins,
+    (SELECT COUNT(*) FROM events e2 WHERE e2.user_id=u.id AND e2.event LIKE 'view_%') views,
+    (SELECT MAX(ts) FROM events e3 WHERE e3.user_id=u.id) last_ts,
+    (SELECT GROUP_CONCAT(ev || ':' || c, ', ') FROM (SELECT e4.event ev, COUNT(*) c FROM events e4 WHERE e4.user_id=u.id AND e4.event LIKE 'view_%' GROUP BY e4.event ORDER BY c DESC)) views_by
+    FROM users u WHERE u.completed_at IS NOT NULL ORDER BY opens DESC LIMIT 500`).all();
+  return { users: rows };
+});
+
 route('GET', '/api/admin/summary', ({req, url}) => {
   admin(req, url);
   const n = sql => q(sql).get().n;

@@ -12,11 +12,11 @@ Build `2026-10-15-v3` · 15 Oct 2026 (v3: launch build, team feedback round 2) �
 
 ```bash
 node 2-dandiya-nights-code.js          # → ./dandiya-nights/
-cd dandiya-nights/server && npm test   # 227 checks, ends with "ALL CHECKS PASSED"
+cd dandiya-nights/server && npm test   # 194 checks, ends with "ALL CHECKS PASSED"
 ```
 
 ## 0. What's left before the public link
-The product is finished and tested (227 server checks, plus a real-browser run of the whole flow on a phone and a laptop). Login codes, pair alerts and photos work with nothing but env vars. What's left:
+The product is finished and tested (194 server checks, plus a real-browser run of the whole flow on a phone and a laptop). Login codes, pair alerts and photos work with nothing but env vars. What's left:
 
 | # | Task | Where | Time |
 |---|---|---|---|
@@ -40,7 +40,6 @@ account lookup (`findPicapoolUser` + `lookupWired: true` + `CONFIG.PICAPOOL_LOOK
 **Chat and the Picapool check are off** until Picapool's backend is connected (`CHAT_ENABLED`, `PICAPOOL_LOOKUP` in the page): pairs swap numbers, and nobody sees "Checking for a Picapool account".
 **Links filled in:** Play Store (`com.picapool`), App Store (`id6480370782`), Terms and Privacy on picapool.com. The 18+ and "wrap" pages link to the right store for the phone.
 **Laptops:** tonight's Garba Queen and Garba King (top 5 each, live) sit to the right of the app.
-**Gender and who you dance with** (team feedback, Krish): the gender question is now **"Are you a guy or a girl?"** plus **"Who do you want to dance with? Girls / Guys / Everyone"** (nothing pre-picked; the other gender is suggested once you pick yours) and a Continue button. Two people see each other only when each is someone the other wants to dance with. Both can be changed from Profile → "You're a guy · Dancing with girls" → Change (a new gender clears picks and pairs; photos and events stay). Boards stay Garba Queen (girls) / Garba King (guys). A new account confirms the question after the code if it was answered on an earlier visit.
 **Admin:** **Download signups (CSV)** (number, name, gender, college, invite link, events) and "Events people are going to".
 
 ## 0b. What changed from build k (v2)
@@ -87,7 +86,7 @@ account lookup (`findPicapoolUser` + `lookupWired: true` + `CONFIG.PICAPOOL_LOOK
 | `server/samples.json` | Sample people for the guest peek (replace the photos, §0 step 10) |
 | `server/public/index.html` | The page, already in live mode. Mobile-first, full screen on phones, a centred column on laptops |
 | `server/public/admin.html` | `/admin`: numbers, nightly top-20 check, reports, Picapool clashes, hide/unhide |
-| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 227 checks (including the WhatsApp and MSG91 messages against a fake server). Never touches real data |
+| `server/test/api.test.js` | `npm test`. Own server on a temp folder, 194 checks (including the WhatsApp and MSG91 messages against a fake server). Never touches real data |
 | `server/seed.js` · `export.js` · `Dockerfile` | Fake test profiles (`npm run seed:test` / `seed:remove`) · CSV of accounts (`npm run export`) · Docker |
 | `demo.html` | Same as `3-demo.html` |
 | `source/` | `template.html` (the one source for the page), `build.py`, logo files, `fonts/` (DM Serif Display + Figtree, SIL Open Font License). After a change: `python3 source/build.py` rewrites `server/public/index.html` and `demo.html` |
@@ -97,7 +96,7 @@ account lookup (`findPicapoolUser` + `lookupWired: true` + `CONFIG.PICAPOOL_LOOK
 ## 2. Run locally
 ```bash
 cd server
-npm test                 # 227 checks
+npm test                 # 194 checks
 npm run seed:test        # 20 fake girls + 20 fake guys (phones start with 5)
 npm run dev              # http://localhost:8080 · login code is always 1234 · codes print in the log
 ```
@@ -256,14 +255,13 @@ Laptops (1100 px and wider): tonight's Garba Queen and Garba King, top 5 each, b
 ## 7. API (JSON; errors are `{message, code?}` written for the user)
 | Method, path | Auth | Purpose |
 |---|---|---|
-| `GET /api/preview?gender=female\|male\|everyone&me=female\|male` | public | Guest peek and sign-up crowd: tonight's top 5 (board order, then a daily shuffle), then samples. `{profiles: [{id, name, college, dates, prompt, photo, sample?}], count}`. Never phones or event names. `count` = real visible people of that side, or `null` (§3). Cached 2 min |
+| `GET /api/preview?gender=female\|male` | public | Guest peek and sign-up crowd: tonight's top 5 (board order, then a daily shuffle), then samples. `{profiles: [{id, name, college, dates, prompt, photo, sample?}], count}`. Never phones or event names. `count` = real visible people of that side, or `null` (§3). Cached 2 min |
 | `GET /api/leaderboard?board=queen\|king&period=tonight\|week` | optional | **Changed.** Up to 20 per board: picked people first, then the rest of the race. Name, college, photo. With a token adds `me: {count, rank}` (private; `rank` only if picked) |
 | `POST /api/auth/otp` `{phone, channel?}` · `POST /api/auth/verify` `{phone, code, ref, entry, sessionId}` | public | **Changed.** `channel: 'sms'` = "Send by SMS instead". → `{ok, via: 'whatsapp'\|'sms', alt}` (`alt` = the other way available, or null). Codes: 30 s cooldown, 5/hour per phone, 40/hour per network, 5 tries, 10 min expiry → `{token, user, profile}`. Tokens last 30 days |
 | `POST /api/auth/logout` | token | **New.** Ends this session on the server |
 | `POST /api/picapool/lookup` | token | → `{status: 'found'\|'not_found'\|'unavailable', user, synced?}` |
 | `POST /api/integrations/picapool-user` | `X-Picapool-Secret` | Picapool's push (§4b) |
-| `POST /api/account` `{firstName, gender, pref?, college, adult:true}` | token | Creates/updates the account (also used to edit the college). `pref` = who they want to dance with: `male` \| `female` \| `everyone` (empty = the other gender). Picapool's name and gender win once linked |
-| `POST /api/account/gender` `{gender?, pref?}` | token | **New.** Change gender and/or who they dance with. A new gender clears their picks, pairs and "not for me"; 409 while linked to Picapool |
+| `POST /api/account` `{firstName, gender, college, adult:true}` | token | Creates/updates the account (also used to edit the college). Picapool's name and gender win once linked |
 | `POST /api/age-block` | token | Under-18: deletes the account, keeps only a count |
 | `POST /api/photos {photo}` | token | **New.** One photo (base64 JPG/PNG/WebP, ≤ 1.5 MB) → `{url}`. The page uploads each photo as it's picked, then saves the URLs in the pass. 60 per hour |
 | `PUT /api/profile` | token | **Changed.** The pass: `photos` (0 to 5; URLs from `/api/photos` or base64, first = main), `plans` (required, 1 to 5: `[{name, dates: ['2026-10-17'], time: '20:00'}]`, dates within Navratri, same name twice counts once), `prompt {id, text}`, `inBoard`, `paused` (kept if not sent). Strips phones/handles/links from the line and event names |
@@ -390,5 +388,4 @@ On a real Android phone **opened from a WhatsApp chat**, plus one iPhone:
 | v2.1 | Team feedback round 1: code-screen scroll fix, story sharing restored, live boards with 15+ a side, photo upload prompted, line prompt after 5 swipes, review skipped profiles. Design changes for screens 2–4 and Krish's cosmetic changes still to come | Team, 15 Oct |
 | v2.1 | Security and performance pass: see §17 | 15 Oct |
 | v3 | Team feedback round 2: landing headline "Find your Dandiya partner.", no icon rows, outline heart instead of the dandiya art; swiping fixed; "Which nights" removed; events typed by people (multiple, each with days and time) instead of fixed venues; 4-digit codes kept; WhatsApp + MSG91 codes and pair alerts; chat and the Picapool check off until Picapool's backend is connected; real store/Terms/Privacy links; hosting on our own server | Deepanshu, 15 Oct |
-| v3 | Gender question reworded and gender preference added (Girls / Guys / Everyone, mutual), changeable in Profile | Krish + Deepanshu, 15 Oct |
 | v2 | **Counts on** (sign-up crowd and reveal), behind `SHOW_COUNTS` and `COUNT_MIN`. Overrides build k's "no counts" rule; **Purav to confirm** | Deepanshu, 14 Oct; Purav to confirm |

@@ -84,7 +84,7 @@ function peopleView(){const f=q.toLowerCase();
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([L.join('\n')],{type:'text/csv'}));a.download='dandiya-people.csv';a.click()}}
 const evData=d=>d&&Object.keys(d).length?esc(JSON.stringify(d)):'';
 function feedView(ev){return `<p class="mut">Last ${ev.length} events, newest first.</p>`+table(['Time (IST)','Event','Who','Phone','Details','Ref'],ev.map(e=>`<tr><td>${ist(e.ts)}</td><td>${esc(e.event)}</td><td>${e.user_id?`<a href="#" data-u="${esc(e.user_id)}">${esc(e.name||e.user_id)}</a>`:'<span class="mut">visitor '+esc((e.session_id||'').slice(0,6))+'</span>'}</td><td>${contact(e.phone)}</td><td>${evData(e.data)}</td><td>${esc(e.ref||'')}</td></tr>`))}
-function photosView(rows){return `<p class="mut">${rows.length} pending first-photo reviews.</p>`+table(['Name','College','Phone','Photo','At (IST)','',''],rows.map(r=>`<tr><td>${esc(r.first_name||'')}</td><td>${esc(r.college||'')}</td><td>${esc(r.phone||'')}</td><td>${esc(r.photo||'')}</td><td>${ist(r.at)}</td><td><button onclick="photoAct(${r.id},'approve')">Approve</button></td><td><button onclick="photoAct(${r.id},'takedown')">Takedown</button></td></tr>`))}
+function photosView(rows){return `<p class="mut">${rows.length} pending first-photo reviews.</p>`+table(['Name','College','Phone','Photo','At (IST)','',''],rows.map(r=>`<tr><td>${esc(r.first_name||'')}</td><td>${esc(r.college||'')}</td><td>${esc(r.phone||'')}</td><td>${r.photo?'<a href="'+esc(r.photo)+'" target="_blank" title="'+esc(r.photo)+'"><img src="'+esc(r.photo)+'" style="height:56px;width:56px;object-fit:cover;border-radius:8px"></a>':''}</td><td>${ist(r.at)}</td><td><button onclick="photoAct(${r.id},'approve')">Approve</button></td><td><button onclick="photoAct(${r.id},'takedown')">Takedown</button></td></tr>`))}
 async function photoAct(id,act){const r=await fetch('/api/admin/photo-'+act,{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Key':KEY},body:JSON.stringify({id})});if(!r.ok){alert('Failed');return}delete D.q;show()}
 function feedbackView(rows){const avg=rows.length?(rows.reduce((a,r)=>a+r.rating,0)/rows.length).toFixed(1):'-';return `<p class="mut">${rows.length} responses, avg ${avg} stars.</p>`+table(['At (IST)','Name','Phone','Rating','Text'],rows.map(r=>`<tr><td>${ist(r.at)}</td><td>${esc(r.first_name||'')}</td><td>${esc(r.phone||'')}</td><td>${r.rating}</td><td>${esc(r.text||'')}</td></tr>`))}
 function swipesView(s){return `<p class="mut">${s.length} swipes, newest first.</p>`+table(['Time (IST)','Who swiped','Phone','Swipe','On','Their phone','Matched?'],s.map(w=>`<tr><td>${ist(w.at)}</td><td><a href="#" data-u="${esc(w.from_id)}">${esc(w.from_name||w.from_id)}</a> <span class="mut">${esc(w.from_college||'')}</span></td><td>${contact(w.from_phone)}</td><td>${w.dir==='right'?'<span class="tag grn">LIKE</span>':'<span class="tag">pass</span>'}</td><td><a href="#" data-u="${esc(w.to_id)}">${esc(w.to_name||w.to_id)}</a> <span class="mut">${esc(w.to_college||'')}</span></td><td>${contact(w.to_phone)}</td><td>${w.matched?'<span class="tag grn">match</span>':''}</td></tr>`))}
@@ -130,4 +130,257 @@ async function openLink(code){const d=$('#drawer');d.style.display='block';d.inn
 document.addEventListener('click',e=>{const a=e.target.closest('a[data-u]');if(a){e.preventDefault();openUser(a.dataset.u)}});
 $('#load').onclick=()=>{KEY=$('#key').value.trim();try{sessionStorage.setItem('st_admin',KEY)}catch(e){}Object.keys(D).forEach(k=>delete D[k]);show()};
 drawTabs();if(KEY)show();
-</script></body></html>
+
+</script>
+<script>
+/* batch 2026-10-16: WA master toggle, per-user mute, nudge button, broadcast, engagement, WA log */
+function waApiPost(pp, body) { return fetch(pp, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': KEY }, body: JSON.stringify(body || {}) }).then(r => r.json()); }
+function waPanel() {
+  let dd = document.querySelector('#waPanel');
+  if (!dd) { dd = document.createElement('div'); dd.id = 'waPanel'; dd.style.cssText = 'position:fixed;right:16px;top:60px;width:430px;max-height:80vh;overflow:auto;background:#fff;border:2px solid #000;border-radius:12px;padding:14px;z-index:99;display:none;font-size:13px'; document.body.appendChild(dd); }
+  return dd;
+}
+function initWaControls() {
+  const L = document.querySelector('#load'); if (!L || document.querySelector('#waMasterBtn')) return;
+  const mk = (id, label) => { const b = document.createElement('button'); b.id = id; b.textContent = label; b.style.marginLeft = '8px'; L.parentNode.appendChild(b); return b; };
+  const t = mk('waMasterBtn', 'WhatsApp: ...');
+  const paint = on => { t.dataset.on = on ? '1' : '0'; t.textContent = on ? 'WhatsApp: ON' : 'WhatsApp: OFF'; t.style.background = on ? '#1a7f37' : '#c0392b'; t.style.color = '#fff'; };
+  t.onclick = async () => { const cur = t.dataset.on === '1'; const r = await waApiPost('/api/admin/wa-master', { on: !cur }); paint(r.master === 'on'); };
+  api('/api/admin/wa-state').then(r => paint(r.master === 'on')).catch(() => { t.textContent = 'WhatsApp: ?'; });
+  mk('bcOpenBtn', 'Broadcast').onclick = showBroadcast;
+  mk('waLogBtn', 'WA Log').onclick = showWaLog;
+}
+async function loadQueueTable() {
+  const q = await api('/api/admin/outbound-queue');
+  const el = document.querySelector('#bcQueue'); if (!el) return;
+  el.innerHTML = q.rows.length ? table(['ID', 'Phone', 'Kind', 'Reason', 'Created'], q.rows.map(x => `<tr><td>${x.id}</td><td>${esc(x.phone)}</td><td>${esc(x.kind)}</td><td>${esc(x.reason)}</td><td>${ist(x.created_at)}</td></tr>`)) : '<p class="mut">queue empty</p>';
+}
+async function showBroadcast() {
+  const dd = waPanel(); dd.style.display = 'block';
+  dd.innerHTML = `<h3>Post-event broadcast</h3><p class="mut">Manual send only. {{name}} merges first name. Free-form sends only reach users who messaged us in the last 24h; everyone else queues for template approval.</p><textarea id="bcMsg" rows="4" style="width:100%" placeholder="Hi {{name}}! ..."></textarea><div style="margin:8px 0"><button id="bcPrev">Preview audience</button> <button id="bcSend">Send broadcast</button></div><div id="bcRes" class="mut"></div><h4>Queued sends</h4><div id="bcQueue">...</div><button id="bcFlush">Flush queue</button> <button id="bcClose">Close</button>`;
+  document.querySelector('#bcClose').onclick = () => dd.style.display = 'none';
+  document.querySelector('#bcPrev').onclick = async () => { const r = await api('/api/admin/broadcast-preview'); document.querySelector('#bcRes').textContent = 'Audience: ' + r.total + ' signed-up users - ' + r.inWindow + ' in 24h window (send now), ' + r.queued + ' would queue'; };
+  document.querySelector('#bcSend').onclick = async () => {
+    const message = document.querySelector('#bcMsg').value;
+    if (!message.trim()) { document.querySelector('#bcRes').textContent = 'Type a message first.'; return; }
+    if (!confirm('Send broadcast to the full audience now?')) return;
+    document.querySelector('#bcRes').textContent = 'Sending...';
+    const r = await waApiPost('/api/admin/broadcast', { message });
+    document.querySelector('#bcRes').textContent = r.message || JSON.stringify(r);
+    loadQueueTable();
+  };
+  document.querySelector('#bcFlush').onclick = async () => { const r = await waApiPost('/api/admin/queue-flush'); document.querySelector('#bcRes').textContent = 'flush: sent ' + r.sent + ', still queued ' + r.stillQueued + ', failed ' + r.failed; loadQueueTable(); };
+  loadQueueTable();
+}
+async function showWaLog() {
+  const dd = waPanel(); dd.style.display = 'block';
+  const r = await api('/api/admin/wa-log');
+  dd.innerHTML = '<h3>WhatsApp outbound log</h3><p class="mut">Every outbound WhatsApp attempt: type, status, time (IST).</p>' + (r.rows.length ? table(['When', 'Phone', 'Type', 'Status', 'Detail'], r.rows.map(x => `<tr><td>${ist(x.ts)}</td><td>${esc(x.phone)}</td><td>${esc(x.type)}</td><td>${esc(x.status)}</td><td>${esc(x.detail || '')}</td></tr>`)) : '<p class="mut">nothing sent yet</p>') + '<div style="margin-top:8px"><button id="wlClose">Close</button></div>';
+  document.querySelector('#wlClose').onclick = () => dd.style.display = 'none';
+}
+async function injectUserExtras(uid) {
+  if (document.querySelector('#uExtras')) return;
+  const ban = document.querySelector('#banBtn'); if (!ban) return;
+  const host = document.createElement('div'); host.id = 'uExtras'; host.style.cssText = 'border-top:1px solid #ccc;margin-top:10px;padding-top:8px';
+  host.innerHTML = '<div class="mut">loading messaging + engagement...</div>';
+  ban.closest('div').appendChild(host);
+  try {
+    const [eng, wal] = await Promise.all([api('/api/admin/engagement?user_id=' + uid), api('/api/admin/wa-log?user_id=' + uid)]);
+    host.innerHTML = `<h4>WhatsApp messaging: <button id="uMute">${eng.wa_muted ? 'OFF (muted)' : 'ON'} - tap to ${eng.wa_muted ? 'enable' : 'mute'}</button></h4><h4>Engagement</h4><p>App opens: ${eng.opens} · Logins: ${eng.logins} · Page views: ${eng.views}</p><p class="mut">Views by page: ${eng.viewsByPage.map(v => v.event.replace('view_', '') + ': ' + v.c).join(', ') || 'none yet'}</p><h4>Recent activity (IST)</h4>` + (eng.timeline.length ? table(['When', 'Event', 'Details'], eng.timeline.map(x => `<tr><td>${ist(x.ts)}</td><td>${esc(x.event)}</td><td>${esc(x.data || '')}</td></tr>`)) : '<p class="mut">no activity yet</p>') + `<h4>WhatsApp sends to this user</h4><p class="mut">${wal.rollup.map(r2 => r2.type + ': ' + r2.c).join(' · ') || 'none yet'}</p>` + (wal.rows.length ? table(['When', 'Type', 'Status', 'Detail'], wal.rows.map(x => `<tr><td>${ist(x.ts)}</td><td>${esc(x.type)}</td><td>${esc(x.status)}</td><td>${esc(x.detail || '')}</td></tr>`)) : '');
+    document.querySelector('#uMute').onclick = async () => { await waApiPost('/api/admin/wa-mute', { userId: uid, muted: !eng.wa_muted }); document.querySelector('#uExtras').remove(); injectUserExtras(uid); };
+  } catch (e) { host.innerHTML = '<div class="mut">engagement failed to load</div>'; }
+}
+async function injectNudge() {
+  if (document.querySelector('#nudgeBar')) return;
+  const h = [...document.querySelectorAll('p, h2, h3')].find(x => /pending first-photo reviews/.test(x.textContent));
+  if (!h) return;
+  let r; try { r = await api('/api/admin/no-photo-users'); } catch (e) { return; }
+  const bar = document.createElement('div'); bar.id = 'nudgeBar'; bar.style.margin = '8px 0';
+  bar.innerHTML = `<button id="nudgeGo">Nudge ${r.count} no-photo users on WhatsApp</button> <span id="nudgeRes" class="mut"></span>`;
+  h.parentNode.insertBefore(bar, h.nextSibling);
+  document.querySelector('#nudgeGo').onclick = async () => {
+    if (!confirm('Nudge ' + r.count + ' no-photo users?')) return;
+    document.querySelector('#nudgeRes').textContent = ' working...';
+    const rr = await waApiPost('/api/admin/nudge-nophoto');
+    document.querySelector('#nudgeRes').textContent = ' ' + (rr.message || JSON.stringify(rr));
+  };
+}
+async function injectOverview() {
+  if (document.querySelector('#engAvg')) return;
+  let r; try { r = await api('/api/admin/engagement-overview'); } catch (e) { return; }
+  const dd = document.createElement('div'); dd.id = 'engAvg'; dd.style.cssText = 'border:1px solid #000;border-radius:10px;padding:8px;margin:8px 0';
+  dd.innerHTML = `<b>Engagement (all users)</b> - avg app opens/user: ${r.avgOpens} · avg logins/user: ${r.avgLogins} · avg page views/user: ${r.avgViews} <span class="mut">(${r.totalOpens} opens, ${r.totalLogins} logins, ${r.totalViews} views across ${r.users} users)</span>`;
+  const first = document.querySelector('#d h2, #d table, h2, table');
+  if (first) first.parentNode.insertBefore(dd, first);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b && b.textContent.trim() === 'Photos') setTimeout(injectNudge, 900);
+  if (b && b.textContent.trim() === 'Overview') setTimeout(injectOverview, 900);
+});
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-u]');
+  if (!a) return;
+  const uid = a.dataset.u;
+  setTimeout(() => injectUserExtras(uid), 900);
+});
+setTimeout(initWaControls, 800);
+setTimeout(initWaControls, 2500);
+</script>
+
+
+
+<script>
+/* batch fix2 06:10: persistent host survives the page drawer re-renders */
+(function(){
+  let host = null, hostUid = null;
+  function build(uid, drawer) {
+    host = document.createElement('div');
+    host.id = 'uExtras'; hostUid = uid;
+    host.style.cssText = 'border-top:1px solid #ccc;margin-top:10px;padding-top:8px';
+    host.innerHTML = '<div class="mut">loading messaging + engagement...</div>';
+    drawer.appendChild(host);
+    Promise.all([api('/api/admin/engagement?user_id=' + uid), api('/api/admin/wa-log?user_id=' + uid)]).then(function(res) {
+      const eng = res[0], wal = res[1];
+      if (!host) return;
+      host.innerHTML = `<h4>WhatsApp messaging: <button id="uMute">${eng.wa_muted ? 'OFF (muted)' : 'ON'} - tap to ${eng.wa_muted ? 'enable' : 'mute'}</button></h4><h4>Engagement</h4><p>App opens: ${eng.opens} · Logins: ${eng.logins} · Page views: ${eng.views}</p><p class="mut">Views by page: ${eng.viewsByPage.map(v => v.event.replace('view_', '') + ': ' + v.c).join(', ') || 'none yet'}</p><h4>Recent activity (IST)</h4>` + (eng.timeline.length ? table(['When', 'Event', 'Details'], eng.timeline.map(x => `<tr><td>${ist(x.ts)}</td><td>${esc(x.event)}</td><td>${esc(x.data || '')}</td></tr>`)) : '<p class="mut">no activity yet</p>') + `<h4>WhatsApp sends to this user</h4><p class="mut">${wal.rollup.map(r2 => r2.type + ': ' + r2.c).join(' · ') || 'none yet'}</p>` + (wal.rows.length ? table(['When', 'Type', 'Status', 'Detail'], wal.rows.map(x => `<tr><td>${ist(x.ts)}</td><td>${esc(x.type)}</td><td>${esc(x.status)}</td><td>${esc(x.detail || '')}</td></tr>`)) : '');
+      const mb = host.querySelector('#uMute');
+      if (mb) mb.onclick = async () => { await waApiPost('/api/admin/wa-mute', { userId: uid, muted: !eng.wa_muted }); if (host) { host.remove(); host = null; hostUid = null; } };
+    }).catch(() => { if (host) host.innerHTML = '<div class="mut">engagement failed to load</div>'; });
+  }
+  setInterval(() => {
+    const drawer = document.querySelector('#drawer');
+    if (!drawer) return;
+    const umatch = drawer.textContent.match(/u_[a-z0-9]{10,}/);
+    if (!umatch) return;
+    const uid = umatch[0];
+    if (host && hostUid === uid) { if (host.parentNode !== drawer) drawer.appendChild(host); return; }
+    if (host) { host.remove(); host = null; hostUid = null; }
+    build(uid, drawer);
+  }, 1200);
+})();
+</script>
+
+<script>
+/* analysis tab 06:21 */
+(function(){
+  let anPanel = null, anActive = false;
+  function findTabBar() {
+    const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'Feedback');
+    return b ? b.parentElement : null;
+  }
+  function ensureTabBtn() {
+    const bar = findTabBar(); if (!bar) return;
+    let btn = document.querySelector('#analysisTabBtn');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'analysisTabBtn'; btn.textContent = 'Analysis';
+      bar.appendChild(btn);
+    }
+    btn.className = anActive ? 'on' : 'ghost';
+  }
+  function ensurePanel() {
+    if (anPanel) return;
+    anPanel = document.createElement('div');
+    anPanel.id = 'analysisPanel';
+    anPanel.style.cssText = 'display:none;position:fixed;left:0;right:0;bottom:0;overflow:auto;padding:14px 16px;z-index:5;background:' + getComputedStyle(document.body).backgroundColor;
+    document.body.appendChild(anPanel);
+  }
+  async function loadAnalysis() {
+    anPanel.innerHTML = '<p class="mut">loading analysis...</p>';
+    try {
+      const res = await Promise.all([api('/api/admin/engagement-overview'), api('/api/admin/analysis')]);
+      const ov = res[0], an = res[1];
+      anPanel.innerHTML = `<h3 style="margin:4px 0">Engagement analysis</h3><div class="card" style="padding:8px 10px;margin-bottom:10px">Avg app opens / user: <b>${ov.avgOpens}</b> &middot; Avg logins / user: <b>${ov.avgLogins}</b> &middot; Avg page views / user: <b>${ov.avgViews}</b> <span class="mut">(${ov.totalOpens} opens, ${ov.totalLogins} logins, ${ov.totalViews} views across ${ov.users} users)</span> <button id="anRefresh" style="margin-left:10px">Refresh</button> <span class="mut">click a person for their exact action timeline</span></div><div class="wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>App opens</th><th>Logins</th><th>Page views</th><th>Views by page</th><th>Last action (IST)</th></tr></thead><tbody id="anBody"></tbody></table></div>`;
+      const body = anPanel.querySelector('#anBody');
+      an.users.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${esc(u.name || '')}</td><td>${esc(u.phone || '')}</td><td>${u.opens}</td><td>${u.logins}</td><td>${u.views}</td><td class="mut">${esc((u.views_by || '').replace(/view_/g, ''))}</td><td>${u.last_ts ? ist(u.last_ts) : '-'}</td>`;
+        tr.style.cursor = 'pointer';
+        tr.onclick = () => toggleTimeline(tr, u);
+        body.appendChild(tr);
+      });
+      if (!an.users.length) body.innerHTML = '<tr><td colspan="7" class="mut">no completed signups yet</td></tr>';
+      anPanel.querySelector('#anRefresh').onclick = loadAnalysis;
+    } catch (e) { anPanel.innerHTML = '<p class="mut">analysis failed to load</p>'; }
+  }
+  async function toggleTimeline(tr, u) {
+    const next = tr.nextElementSibling;
+    if (next && next.classList.contains('anTL')) { next.remove(); return; }
+    const tlr = document.createElement('tr');
+    tlr.className = 'anTL';
+    tlr.innerHTML = '<td colspan="7" class="mut">loading timeline...</td>';
+    tr.after(tlr);
+    try {
+      const eng = await api('/api/admin/engagement?user_id=' + u.user_id);
+      tlr.innerHTML = `<td colspan="7"><b>${esc(u.name || '')} - every action, exact IST</b>` + (eng.timeline.length ? table(['When (IST)', 'Action', 'Details'], eng.timeline.map(x => `<tr><td>${ist(x.ts)}</td><td>${esc(x.event)}</td><td>${esc(x.data || '')}</td></tr>`)) : ' <span class="mut">no activity yet</span>') + '</td>';
+    } catch (e) { tlr.innerHTML = '<td colspan="7" class="mut">timeline failed to load</td>'; }
+  }
+  function activate() {
+    ensurePanel();
+    const bar = findTabBar();
+    if (bar) anPanel.style.top = (bar.getBoundingClientRect().bottom + 6) + 'px';
+    anActive = true; ensureTabBtn();
+    anPanel.style.display = 'block';
+    loadAnalysis();
+  }
+  function deactivate() {
+    anActive = false; ensureTabBtn();
+    if (anPanel) anPanel.style.display = 'none';
+  }
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!btn) return;
+    if (btn.id === 'analysisTabBtn') { anActive ? deactivate() : activate(); return; }
+    const bar = findTabBar();
+    if (anActive && bar && bar.contains(btn)) deactivate();
+  }, true);
+  setInterval(ensureTabBtn, 1500);
+})();
+</script>
+
+<script>
+/* photos clickable 06:35 */
+(function(){
+  const st = document.createElement('style');
+  st.textContent = 'img{cursor:zoom-in}';
+  document.head.appendChild(st);
+  document.addEventListener('click', (e) => {
+    const img = e.target && e.target.closest ? e.target.closest('img') : null;
+    if (!img || !img.getAttribute('src')) return;
+    if (img.closest('a')) return;
+    e.preventDefault(); e.stopPropagation();
+    window.open(img.src, '_blank');
+  }, true);
+})();
+</script>
+
+<script>
+/* drawer photos 06:38 */
+(function(){
+  const phCache = {};
+  async function injectDrawerPhotos() {
+    const labs = [...document.querySelectorAll('div')].filter(d => d.childElementCount === 0 && d.textContent.trim() === 'Photos');
+    for (const lab of labs) {
+      const val = lab.nextElementSibling;
+      if (!val || val.dataset.phDone) continue;
+      let uid = null;
+      const heads = [...document.querySelectorAll('h1,h2,h3,h4,strong,b')];
+      for (const h of heads) { const m = h.textContent.match(/u_[a-z0-9]{10,}/); if (m) { uid = m[0]; break; } }
+      if (!uid) continue;
+      val.dataset.phDone = '1';
+      try {
+        if (!phCache[uid]) {
+          const d = await api('/api/admin/user?id=' + uid);
+          phCache[uid] = (d.profileRaw && d.profileRaw.photos || []).filter(Boolean);
+        }
+        const photos = phCache[uid];
+        if (!photos.length) continue;
+        val.innerHTML = photos.map(u => '<a href="' + esc(u) + '" target="_blank" title="open full size"><img src="' + esc(u) + '" style="height:56px;width:56px;object-fit:cover;border-radius:8px;margin:2px"/></a>').join('');
+      } catch (e) {}
+    }
+  }
+  setInterval(injectDrawerPhotos, 1200);
+})();
+</script>
+</body></html>

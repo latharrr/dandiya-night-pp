@@ -169,7 +169,6 @@ img{display:block}
 .label em{font-style:normal;font-weight:500;color:var(--muted);margin-left:4px}
 .pills{display:flex;flex-wrap:wrap;gap:8px}
 .pill{min-height:40px;padding:0 14px;border-radius:99px;border:1.5px solid var(--line);background:#fff;font-size:13.5px;font-weight:600;color:var(--ink-2);transition:all .2s}
-.pills.even .pill{flex:1}
 .pill[aria-pressed=true]{border-color:var(--wine);color:var(--wine);background:#FBEDEF}
 .terms{color:var(--muted);font-size:11.5px;text-align:center;margin-top:10px;line-height:1.5}
 .terms a{text-underline-offset:2px}
@@ -546,9 +545,6 @@ const shareLink = () => `${CONFIG.SHARE_URL}?ref=${myRefSlug()}`;
 /* who I am: once linked to Picapool, its first name and gender win over what was typed here (HANDOFF §4b) */
 const myName = () => (S.user?.firstName) || S.guest?.firstName || '';
 const myGender = () => S.user?.gender || S.guest?.gender || null;
-/* who I want to dance with: 'male' | 'female' | 'everyone' (default: the other gender) */
-const myPref = () => S.user?.pref || S.guest?.pref || (myGender() ? other(myGender()) : null);
-const prefWord = p => p === 'everyone' ? 'everyone' : who(p);
 const myPhoto = () => S.profile?.photos?.[0] || null;
 let dobOk = false; // set on the birthday screen; the date itself is never saved or sent
 let otpVia = 'whatsapp', otpAlt = null; // how the last code went out, and the other way it can go ("Send by SMS instead")
@@ -580,14 +576,13 @@ class LiveApi {
     if (!res.ok) { const err = new Error(json.message || 'Something went wrong. Try again.'); err.code = json.code; err.status = res.status; throw err; }
     return json;
   }
-  getPreview(gender, me)         { return this.req('GET', `/preview?gender=${gender}${me ? '&me=' + me : ''}`); }
+  getPreview(gender)             { return this.req('GET', `/preview?gender=${gender}`); }
   sendOtp(phone, channel)        { return this.req('POST', '/auth/otp', {phone, ...(channel ? {channel} : {})}); }
   uploadPhoto(photo)             { return this.req('POST', '/photos', {photo}); }
   popularEvents()                { return this.req('GET', '/events/popular'); }
   verifyOtp(phone, code)         { return this.req('POST', '/auth/verify', {phone, code, ref: S.ref, entry: S.entry, sessionId: S.sessionId}); }
   lookupPicapool()               { return this.req('POST', '/picapool/lookup', {}); }
   saveAccount(acc)               { return this.req('POST', '/account', acc); }
-  saveIdentity(x)                { return this.req('POST', '/account/gender', x); }
   recordAgeBlock()               { return this.req('POST', '/age-block', {}); }
   saveProfile(p)                 { return this.req('PUT', '/profile', p); }
   setPaused(paused)              { return this.req('POST', '/profile/pause', {paused}); }
@@ -640,9 +635,9 @@ class MockApi {
   }
   persist() { store.set('dn_mock', this.db); }
   likesMe(p) { return rng(p.id + S.phone)() < 0.42; }
-  async getPreview(gender, me) {
+  async getPreview(gender) {
     await sleep(250);
-    const top = this.people.filter(p => (gender === 'everyone' || p.gender === gender) && (!me || other(p.gender) === me)).sort((a, b) => b.tonight - a.tonight || a.id.localeCompare(b.id));
+    const top = this.people.filter(p => p.gender === gender).sort((a, b) => b.tonight - a.tonight || a.id.localeCompare(b.id));
     return {profiles: top.slice(0, CONFIG.GUEST_PEEK_LIMIT).map(p => ({id: p.id, name: p.name, college: p.college, dates: upcomingDates(p), prompt: p.prompt, photo: p.photos[0], sample: true})),
       count: gender === 'female' ? 184 : 211};
   }
@@ -659,7 +654,6 @@ class MockApi {
   }
   async saveAccount(acc) { await sleep(250); const old = this.db.users[S.phone] || {}; const user = {id: 'u' + hash(S.phone), hasPicapool: false, ...acc}; this.db.users[S.phone] = {...old, user}; this.persist(); return {user}; }
   async recordAgeBlock() { return {ok: true}; }
-  async saveIdentity({gender, pref}) { await sleep(250); const u = this.db.users[S.phone]; if (u?.user) { Object.assign(u.user, {gender, pref}); this.persist(); } return {user: {...S.user, gender, pref}}; }
   async saveProfile(p) {
     await sleep(350);
     if ((p.photos || []).length > CONFIG.MAX_PHOTOS) throw new Error(`Up to ${CONFIG.MAX_PHOTOS} photos.`);
@@ -671,9 +665,9 @@ class MockApi {
   async setPaused(paused) { await sleep(200); const u = this.db.users[S.phone]; if (u?.profile) { u.profile.paused = !!paused; this.persist(); } return {ok: true, paused: !!paused}; }
   async getFeed({passed}) {
     await sleep(250);
-    const now = Date.now(), fits = p => (myPref() === 'everyone' || p.gender === myPref()) && other(p.gender) === S.user.gender; // sample people want the other gender
-    if (passed) return {profiles: this.people.filter(p => fits(p) && !S.blocked.includes(p.id) && S.swipes[p.id]?.dir === 'left'), rightsLeftToday: localRightsLeft()};
-    const pool = this.people.filter(p => fits(p) && !S.blocked.includes(p.id) && (() => {
+    const me = S.profile, now = Date.now(), g = other(S.user.gender);
+    if (passed) return {profiles: this.people.filter(p => p.gender === g && !S.blocked.includes(p.id) && S.swipes[p.id]?.dir === 'left'), rightsLeftToday: localRightsLeft()};
+    const pool = this.people.filter(p => p.gender === g && !S.blocked.includes(p.id) && (() => {
       const s = S.swipes[p.id]; if (!s) return true;
       return s.dir === 'left' && !s.retried && now - s.at > 24 * 3600e3;
     })());
@@ -693,7 +687,7 @@ class MockApi {
   async getMatches() { return {matches: S.matches}; }
   async getReceivedLikes() {
     await sleep(200);
-    const received = this.people.filter(p => (myPref() === 'everyone' || p.gender === myPref()) && other(p.gender) === S.user.gender && this.likesMe(p) && S.swipes[p.id]?.dir !== 'right'
+    const received = this.people.filter(p => p.gender === other(S.user.gender) && this.likesMe(p) && S.swipes[p.id]?.dir !== 'right'
       && !(S.dismissed || []).includes(p.id) && !S.blocked.includes(p.id)).map(p => ({person: p, at: Date.now(), passed: S.swipes[p.id]?.dir === 'left'}));
     return {received};
   }
@@ -814,7 +808,7 @@ function nextStepAfterLogin() {
   if (S.profile) return 'app';
   if (CONFIG.PICAPOOL_LOOKUP && !S.picapool) return 'lookup';
   if (!myName()) return 'name';
-  if (!myGender() || (S.askGender && !S.profile)) return 'gender';
+  if (!myGender()) return 'gender';
   if (!S.user?.adult && !dobOk) return 'birthday';
   if (!S.user?.adult || !S.user?.college) return 'college';
   return 'plans';
@@ -823,23 +817,22 @@ function nextStepAfterLogin() {
 /* sign-up frame: live crowd on top, one question on a cream card */
 let crowdCache = {}; // gender → {faces, count}
 async function loadCrowd(g) {
-  const k = g + ':' + (myGender() || '');
-  if (crowdCache[k]) return crowdCache[k];
-  try { const r = await api.getPreview(g, myGender()); crowdCache[k] = {faces: (r.profiles || []).map(p => p.photo).filter(Boolean), count: typeof r.count === 'number' ? r.count : null}; }
-  catch (e) { crowdCache[k] = {faces: [], count: null}; }
-  return crowdCache[k];
+  if (crowdCache[g]) return crowdCache[g];
+  try { const r = await api.getPreview(g, []); crowdCache[g] = {faces: (r.profiles || []).map(p => p.photo).filter(Boolean), count: typeof r.count === 'number' ? r.count : null}; }
+  catch (e) { crowdCache[g] = {faces: [], count: null}; }
+  return crowdCache[g];
 }
 function crowdLine(g, c) {
   if (c && c.count) return `<i aria-hidden="true"></i><b>${c.count}</b> ${who(g, c.count)} from North Campus are going`;
   return `<i aria-hidden="true"></i>North Campus is going to garba`;
 }
 function crowdHtml() {
-  const g = myPref();
+  const g = myGender() ? other(myGender()) : null;
   return `<div class="crowd"><div class="faces" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => `<span class="face" style="--i:${i}"></span>`).join('')}</div>
-    <p class="live" role="status" id="crowdLine">${crowdLine(g, g && crowdCache[g + ':' + (myGender() || '')])}</p></div>`;
+    <p class="live" role="status" id="crowdLine">${crowdLine(g, g && crowdCache[g])}</p></div>`;
 }
 async function fillCrowd() {
-  const g = myPref(), here = route;
+  const g = myGender() ? other(myGender()) : null, here = route;
   const parts = g ? [await loadCrowd(g)] : await Promise.all([loadCrowd('female'), loadCrowd('male')]);
   if (route !== here) return;
   const faces = g ? parts[0].faces : [0, 1, 2, 3, 4].map(i => parts[i % 2].faces[Math.floor(i / 2)]).filter(Boolean);
@@ -899,35 +892,20 @@ SCREENS.name = () => {
 
 /* ---------- gender ---------- */
 SCREENS.gender = () => {
-  let g = myGender(), pref = S.user?.pref || S.guest?.pref || null, touched = !!pref;
-  const linked = !!S.user?.hasPicapool && !!S.user?.gender;
-  obFrame(`<h1 class="title">Hi ${esc(myName() || 'there')}.<em>Are you a guy or a girl?</em></h1>
-    <div class="choices" role="radiogroup" aria-label="I am a">
-      ${[['male', 'I’m a guy'], ['female', 'I’m a girl']].map(([v, l], i) => `<button class="choice" role="radio" style="--i:${i}" data-v="${v}" aria-checked="${g === v}" ${linked && g !== v ? 'disabled' : ''}><span><strong>${l}</strong></span><span class="tick">${IC.check}</span></button>`).join('')}
+  const g = myGender(), linked = !!S.user?.hasPicapool && !!S.user?.gender;
+  obFrame(`<h1 class="title">Hi ${esc(myName() || 'there')}.<em>Who’s dancing?</em></h1>
+    <div class="choices" role="radiogroup" aria-label="You are">
+      ${[['female', 'Girl'], ['male', 'Guy']].map(([v, l], i) => `<button class="choice" role="radio" style="--i:${i}" data-v="${v}" aria-checked="${g === v}" ${linked && g !== v ? 'disabled' : ''}><span><strong>${l}</strong></span><span class="tick">${IC.check}</span></button>`).join('')}
     </div>
-    <span class="label" id="pl">Who do you want to dance with?</span>
-    <div class="pills even" role="radiogroup" aria-labelledby="pl">${[['female', 'Girls'], ['male', 'Guys'], ['everyone', 'Everyone']].map(([v, l]) => `<button class="pill" role="radio" data-p="${v}">${l}</button>`).join('')}</div>
-    <button class="btn" id="nx" disabled style="margin-top:18px">Continue ${IC.arrow}</button>
-    <p class="note">${linked ? 'Your gender comes from your Picapool account.' : 'You can change both later in Profile.'}</p>`);
-  const nx = $('#nx');
-  const sync = () => {
-    $$('.choice').forEach(x => x.setAttribute('aria-checked', x.dataset.v === g));
-    $$('[data-p]').forEach(x => { x.setAttribute('aria-checked', x.dataset.p === pref); x.setAttribute('aria-pressed', x.dataset.p === pref); });
-    nx.disabled = !g || !pref;
-  };
-  $$('.choice').forEach(b => b.onclick = () => { g = b.dataset.v; if (!touched) pref = other(g); sync(); });
-  $$('[data-p]').forEach(b => b.onclick = () => { pref = b.dataset.p; touched = true; sync(); });
-  sync();
-  nx.onclick = () => {
-    const was = S.guest?.gender ? [S.guest.gender, S.guest.pref || other(S.guest.gender)].join() : null;
-    if (was && was !== [g, pref].join()) { S.guest.likes = []; S.guest.pool = []; S.guest.done = []; } // picks for other people no longer apply; the 5-person limit still counts
-    S.guest = {likes: [], seenIds: [], done: [], pool: [], ...(S.guest || {}), gender: g, pref, genderAt: Date.now()}; S.askGender = false;
-    if (S.user && !S.user.hasPicapool) S.user.gender = g;
-    if (S.user) S.user.pref = pref;
-    save(); track('gender_set', {pref});
-    feed.queue = []; feed.peekLoaded = false;
-    if (S.token) go(nextStepAfterLogin()); else { track('peek_start'); go('peek'); }
-  };
+    <p class="note">${linked ? 'From your Picapool account. Change it in the Picapool app.' : 'This only decides whose cards you see.'}</p>`);
+  $$('.choice').forEach(b => b.onclick = () => {
+    const v = b.dataset.v;
+    if (S.guest?.gender && S.guest.gender !== v) { S.guest.likes = []; S.guest.pool = []; S.guest.done = []; } // picks for the other side no longer apply; the 5-person limit still counts
+    S.guest = {likes: [], seenIds: [], done: [], pool: [], ...(S.guest || {}), gender: v};
+    if (S.user && !S.user.hasPicapool) S.user.gender = v;
+    save(); $$('.choice').forEach(x => x.setAttribute('aria-checked', x === b));
+    setTimeout(() => { feed.queue = []; feed.peekLoaded = false; if (S.token) go(nextStepAfterLogin()); else { track('peek_start'); go('peek'); } }, 260);
+  });
 };
 
 /* ---------- guest peek: tonight's top 5 of the other side, clear photos, picks held on the phone ---------- */
@@ -938,7 +916,7 @@ SCREENS.peek = async () => {
     <header class="head"><button class="back" data-back aria-label="Back">${IC.back}</button>${tonightChip()}<span style="width:40px"></span></header>
     <h1 class="sr-only">Tonight’s top five</h1>
     <div class="deck" id="deck" role="main"><div class="spinner"></div></div>
-    <div class="actions" id="acts"><button class="round skip" id="nope" aria-label="Skip">${IC.x}</button><span>tonight’s top 5${myPref() === 'everyone' ? '' : ' ' + prefWord(myPref())}</span><button class="round pair" id="yep" aria-label="Pair up">${IC.heart(22)}</button></div>
+    <div class="actions" id="acts"><button class="round skip" id="nope" aria-label="Skip">${IC.x}</button><span>tonight’s top five</span><button class="round pair" id="yep" aria-label="Pair up">${IC.heart(22)}</button></div>
     <div class="bottom-cta"><button class="btn" id="mk">Make my pass to see everyone</button></div></section>`;
   $('#nope').onclick = () => flyTop('left'); $('#yep').onclick = () => flyTop('right');
   $('#mk').onclick = () => { track('peek_to_signup', {likes: g.likes.length, seen: g.seenIds.length}); g.likes.length ? peekGate('button') : go('phone'); };
@@ -946,7 +924,7 @@ SCREENS.peek = async () => {
     const room = CONFIG.GUEST_PEEK_LIMIT - g.seenIds.length;
     if (room > 0) {
       try {
-        const r = await api.getPreview(myPref(), g.gender);
+        const r = await api.getPreview(other(g.gender), []);
         const fresh = (r.profiles || []).filter(p => !g.seenIds.includes(p.id)).slice(0, room);
         g.pool.push(...fresh); g.seenIds.push(...fresh.map(p => p.id)); save();
       } catch (e) { if ($('#deck')) $('#deck').innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }
@@ -1025,9 +1003,7 @@ SCREENS.code = () => {
     $('#otp').classList.add('ok'); ins.forEach(i => i.blur());
     try {
       const r = await api.verifyOtp(S.phone, code);
-      S.token = r.token; S.user = r.user || null; S.profile = r.profile || null; S.picapool = null;
-      if (!r.user && !(S.guest?.genderAt && Date.now() - S.guest.genderAt < 30 * 60e3)) S.askGender = true; // answered on an earlier visit: confirm it
-      save();
+      S.token = r.token; S.user = r.user || null; S.profile = r.profile || null; S.picapool = null; save();
       track('otp_verified', {existing: !!r.user});
       go(nextStepAfterLogin());
     } catch (e) { busy = false; $('#otp').classList.remove('ok'); err.textContent = e.message; ins.forEach(i => i.value = ''); ins[0].focus(); }
@@ -1143,7 +1119,7 @@ SCREENS.college = () => {
   const save1 = async college => {
     if (saving) return; saving = true; err.textContent = '';
     try {
-      const r = await api.saveAccount({firstName: myName(), gender: myGender(), pref: myPref(), college, adult: true});
+      const r = await api.saveAccount({firstName: myName(), gender: myGender(), college, adult: true});
       S.user = {...(S.user || {}), ...r.user, adult: true}; save();
       track(editing ? 'profile_edited' : 'account_created');
       if (editing) { editing = null; tab = 'me'; go('app'); toast('Saved'); } else go('plans');
@@ -1242,7 +1218,7 @@ SCREENS.plans = () => {
 
 /* ---------- the reveal: who's going ---------- */
 SCREENS.reveal = async ({sent = 0, first = null} = {}) => {
-  const g = myPref();
+  const g = other(myGender());
   const paint = (faces, count) => {
     app.innerHTML = `<section class="screen night-page reveal">
       <div class="faces" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => { const f = faces.length ? faces[i % faces.length] : null; return `<span class="face" style="--i:${i};${f ? `background-image:url('${esc(f)}')` : ''}"></span>`; }).join('')}</div>
@@ -1255,7 +1231,7 @@ SCREENS.reveal = async ({sent = 0, first = null} = {}) => {
     $('#ex') && ($('#ex').onclick = () => { tab = 'feed'; go('app'); });
   };
   paint([], null);
-  try { const r = await api.getPreview(g, myGender()); if (route === 'reveal') paint((r.profiles || []).filter(p => !p.sample || isDemo()).map(p => p.photo), r.count); } catch (e) {}
+  try { const r = await api.getPreview(g); if (route === 'reveal') paint((r.profiles || []).filter(p => !p.sample || isDemo()).map(p => p.photo), r.count); } catch (e) {}
 };
 
 /* =====================================================================
@@ -1828,7 +1804,6 @@ function renderMe() {
         <div class="set"><span><b>Where you’re going</b><small>${esc(pl.map(x => x.name).join(', ')) || 'Add an event'}</small></span><button class="edit" data-ed="plans">Edit</button></div>
         <div class="set"><span><b>College</b><small>${esc(u.college)}</small></span><button class="edit" data-ed="college">Edit</button></div>
         <div class="set"><span><b>Your line</b><small>${p.prompt?.text ? `${esc(promptLabel(p.prompt.id))}… “${esc(p.prompt.text)}”` : 'Something people can reply to'}</small></span><button class="edit" id="el">${p.prompt?.text ? 'Edit' : 'Add'}</button></div>
-        <div class="set"><span><b>You’re a ${u.gender === 'female' ? 'girl' : 'guy'}</b><small>Dancing with ${prefWord(myPref())}</small></span><button class="edit" id="eg">Change</button></div>
         <label class="set" for="lbT"><span><b>In the ${esc(boardFor(u.gender))} race</b><small>The top ${CONFIG.BOARD_SIZE} are crowned every night</small></span><span class="switch"><input type="checkbox" id="lbT" ${p.inBoard ? 'checked' : ''}><i></i></span></label>
         <label class="set" for="pauseT"><span><b>Pause my pass</b><small>Nobody new sees you. Pairs and chats stay.</small></span><span class="switch"><input type="checkbox" id="pauseT" ${p.paused ? 'checked' : ''}><i></i></span></label>
       </div>
@@ -1844,7 +1819,6 @@ function renderMe() {
   $('#ep').onclick = () => photosSheet();
   $('#el').onclick = () => lineSheet(false);
   $$('[data-ed]').forEach(b => b.onclick = () => { editing = b.dataset.ed; track('card_edit_open', {screen: editing}); go(editing); });
-  $('#eg').onclick = () => identitySheet();
   $('#lbT').onchange = e => setBoard(e.target.checked);
   $('#pauseT').onchange = e => setPaused(e.target.checked);
   $('#del').onclick = () => sheet(`<h2>Delete your pass?</h2><p class="p">Your pass, photos, picks and pairs go. Your Picapool account stays.</p>
@@ -1854,40 +1828,6 @@ function renderMe() {
       track('profile_deleted'); S.profile = null; S.swipes = {}; S.matches = []; S.seenMatchIds = []; feed.queue = []; save(); closeSheet(); go('landing'); toast('Your Dandiya pass is deleted.'); };
   });
   $('#out').onclick = () => { api.logout().catch(() => {}); const ref = S.ref, entry = S.entry; S = Object.assign(freshState(), {ref, entry}); save(); feed = {queue: [], peekLoaded: false, mode: 'new'}; tab = 'feed'; crowdCache = {}; go('landing'); };
-}
-
-/* change "I'm a guy / girl" and "who I want to dance with". A new gender clears picks and pairs on the server; photos and events stay */
-function identitySheet() {
-  const was = S.user.gender, linked = !!S.user.hasPicapool;
-  let g = was, pref = myPref();
-  sheet(`<h2>You and<em>who you dance with</em></h2>
-    <span class="label" style="text-align:left">I’m a</span>
-    <div class="pills even" role="radiogroup" aria-label="I’m a">${[['male', 'Guy'], ['female', 'Girl']].map(([v, l]) => `<button class="pill" role="radio" data-ig="${v}" ${linked && v !== was ? 'disabled' : ''}>${l}</button>`).join('')}</div>
-    <span class="label" style="text-align:left">I want to dance with</span>
-    <div class="pills even" role="radiogroup" aria-label="I want to dance with">${[['female', 'Girls'], ['male', 'Guys'], ['everyone', 'Everyone']].map(([v, l]) => `<button class="pill" role="radio" data-ip="${v}">${l}</button>`).join('')}</div>
-    <p class="note" id="iwarn" style="min-height:20px"></p>
-    <p class="err" id="ierr" role="alert"></p>
-    <button class="btn" id="iSave">Save</button><button class="text-btn" id="iNo">Cancel</button>`, s => {
-    const sync = () => {
-      $$('[data-ig]', s).forEach(x => { x.setAttribute('aria-pressed', x.dataset.ig === g); x.setAttribute('aria-checked', x.dataset.ig === g); });
-      $$('[data-ip]', s).forEach(x => { x.setAttribute('aria-pressed', x.dataset.ip === pref); x.setAttribute('aria-checked', x.dataset.ip === pref); });
-      $('#iwarn', s).textContent = g !== was ? 'Changing this clears your picks and pairs so far. Your photos and events stay.' : linked ? 'Your gender comes from your Picapool account.' : '';
-    };
-    $$('[data-ig]', s).forEach(b => b.onclick = () => { g = b.dataset.ig; sync(); });
-    $$('[data-ip]', s).forEach(b => b.onclick = () => { pref = b.dataset.ip; sync(); });
-    sync();
-    $('#iNo', s).onclick = () => closeSheet();
-    $('#iSave', s).onclick = async () => {
-      const b = $('#iSave', s); b.disabled = true;
-      try {
-        const r = await api.saveIdentity({gender: g, pref});
-        S.user = {...S.user, ...r.user, gender: g, pref}; if (S.guest) Object.assign(S.guest, {gender: g, pref});
-        if (g !== was) { S.swipes = {}; S.matches = []; S.seenMatchIds = []; S.rightsByDay = {}; S.crown = null; S.dismissed = []; serverRightsLeft = null; lb.board = null; }
-        save(); feed = {queue: [], peekLoaded: false, mode: 'new'}; crowdCache = {};
-        track('identity_changed', {genderChanged: g !== was, pref}); closeSheet(); tab = 'feed'; go('app'); toast(`Saved. You’re seeing ${prefWord(pref)} now.`);
-      } catch (e) { b.disabled = false; $('#ierr', s).textContent = e.message; }
-    };
-  });
 }
 
 /* ---------- photos: up to 5, several at once, the first is the main photo ---------- */

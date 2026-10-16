@@ -2,7 +2,7 @@
 
 Picapool's Navratri 2026 web app for Delhi University North Campus. **Find your Dandiya partner:** people say which garba events they're going to (and which day, what time), see who else is going, pair up and swap numbers. Guests can peek at tonight's top 5 before signing up. Garba Queen / Garba King boards, story posters for Instagram and WhatsApp, everything deleted on 20 Oct.
 
-**Status (15 Oct 2026): launch build (v3). Ready to deploy on our own server; login codes and pair alerts switch on with env vars.** Current build: `2026-10-15-v3` · 227 server checks passing + a real-browser run of the whole flow (phone touch swipes, laptop, demo).
+**Status (15 Oct 2026): launch build (v3). Ready to deploy on our own server; login codes and pair alerts switch on with env vars.** Current build: `2026-10-15-v3` · 194 server checks passing + a real-browser run of the whole flow (phone touch swipes, laptop, demo).
 
 ---
 
@@ -11,7 +11,7 @@ Picapool's Navratri 2026 web app for Delhi University North Campus. **Find your 
 open demo.html                       # the whole app in demo mode: sample people, nothing saved
 
 cd server
-npm test                             # 227 checks, ends with "ALL CHECKS PASSED"
+npm test                             # 194 checks, ends with "ALL CHECKS PASSED"
 npm run seed:test                    # optional: 20 fake girls + 20 fake guys
 npm run dev                          # http://localhost:8080 · login code is always 1234
                                      # admin: http://localhost:8080/admin · key dev-admin
@@ -42,7 +42,7 @@ Node 22.13+ only. Nothing to install (built-in SQLite). Add `?new=1` to the page
 ## The product (v3)
 **Look:** two surfaces only. A wine "night" for the welcome and sign-up, calm cream inside the app. DM Serif Display titles with an italic second line, Figtree text (both embedded, OFL). Picapool orange for the one big action on night screens. Modelled on the structure of playgarba.in, with Picapool's own brand, art and copy. Not a dating app: **pick / pair up / paired / pass**; no ages or distances on cards.
 
-**Flow:** Welcome ("Find your Dandiya partner.") → name → **"Are you a guy or a girl?" + "Who do you want to dance with? Girls / Guys / Everyone"** → **guest peek** (tonight's top 5 of the other side, clear photos, SAMPLE tag on samples, picks held) → WhatsApp number → code (WhatsApp, "Send by SMS instead" after 30 s; fills itself) → birthday (only "18+" is sent) → college (tap, saves the account) → **Where are you going for garba?** (pick or type events, multiple; day(s) + time for each) → **reveal** ("26 girls are going to garba this Navratri") → app.
+**Flow:** Welcome ("Find your Dandiya partner.") → name → gender (tap moves on) → **guest peek** (tonight's top 5 of the other side, clear photos, SAMPLE tag on samples, picks held) → WhatsApp number → code (WhatsApp, "Send by SMS instead" after 30 s; fills itself) → birthday (only "18+" is sent) → college (tap, saves the account) → **Where are you going for garba?** (pick or type events, multiple; day(s) + time for each) → **reveal** ("26 girls are going to garba this Navratri") → app.
 Above every sign-up card: blurred faces and a live count. No progress bar (by request).
 
 **App tabs:** Discover · Pairs (Paired / Picked you / You picked) · Board · Profile ("Your pass").
@@ -50,7 +50,6 @@ Above every sign-up card: blurred faces and a live count. No progress bar (by re
 **Features**
 - Photo asked on arrival in Discover and again after the first swipe; up to 5; nobody sees a pass without a photo.
 - "Add a line" prompt after 5 swipes. "Review skipped profiles" at the end of the deck (change your decision).
-- **Gender preference** (mutual): people see each other only when each wants the other's gender; change both from Profile.
 - **Matching by event and day**: the feed shows everyone, people going to the same event on the same day first; shared events are highlighted on cards and pairs ("Both going to Hansraj Garba, Sat 17"). Events 2+ people chose are suggested to everyone.
 - Paired moment → **swap numbers** (only when both agree) + a WhatsApp "new pair" alert to the other person. Chat on Picapool (with a garba plan) is built and comes back with `CHAT_ENABLED` once Picapool's chat is connected.
 - Swiping: touch, mouse and ← / →; flicks count; each card commits once; a failed save puts the card back.
@@ -71,7 +70,7 @@ Above every sign-up card: blurred faces and a live count. No progress bar (by re
 | `server/integrations.js` | Login codes (WhatsApp + MSG91) and pair alerts, set by env vars; Picapool stubs for later |
 | `server/samples.json` | Sample people for the guest peek (placeholder Unsplash photos) |
 | `server/public/index.html` · `admin.html` | Built page (live mode) · admin page |
-| `server/test/api.test.js` | 227 checks, own temp server, never touches real data (WhatsApp/MSG91 checked against a fake server) |
+| `server/test/api.test.js` | 194 checks, own temp server, never touches real data (WhatsApp/MSG91 checked against a fake server) |
 | `server/seed.js` · `export.js` · `Dockerfile` | Fake test profiles · CSV export · Docker |
 | `source/template.html` | **The one source for the page** (CSS + JS, demo and live) |
 | `source/build.py` · `pack.js` · `fonts/` · `*.b64` | Build · handoff packer · embedded fonts · logos |
@@ -92,3 +91,24 @@ Outside the repo (on Deepanshu's Mac): `~/Desktop/Dandiya-Nights-Handoff/` (the 
 
 ## Working on this repo
 After any change: `python3 source/build.py` → `cd server && npm test` → commit → push. Repack the handoff with `node source/pack.js` if the team needs a fresh bundle. Sample photos are Unsplash (free licence) placeholders; fonts are SIL OFL.
+
+## 2026-10-16 - v5 ops batch
+
+### Admin panel (/<ADMIN_PREFIX>/people)
+- WhatsApp ops: master toggle, per-user mute, no-photo nudge (free-form inside a 24h window, else queued for the dandiya_photo_nudge template), broadcast, WA log tab
+- Analysis tab: avg opens/logins/views per user, per-user table, click-to-expand exact-IST timeline
+- Referral links registry with read-only analytics (server/admin3.js)
+- Every rendered photo opens full size (global click handler); the person drawer now shows real clickable thumbnails instead of a count
+
+### User app
+- Board photos: tap opens a full-screen lightbox (prev/next + counter for multi-photo cards); swipe gestures untouched (tap only fires on a no-move pointerup)
+
+### WhatsApp webhook (live site only)
+- GET /api/wa-webhook: Meta verification handshake via WHATSAPP_VERIFY_TOKEN
+- POST /api/wa-webhook: inbound messages update users.last_wa_inbound (24h customer-service-window tracking); message status callbacks log to wa_log
+- X-Hub-Signature-256 enforced when WHATSAPP_APP_SECRET is set in .env (permissive until it is)
+
+### Clone setup (lpu.picapool.tech)
+- /opt/lpu-nights mirrors the same server/ tree; its own .env (PORT 8096, DATA_DIR /var/lib/lpu-nights, APP_URL https://lpu.picapool.tech, clone ADMIN_KEY) stays out of git
+- pm2 app: lpu-nights; DB + photos under /var/lib/lpu-nights
+- Every code change ships to BOTH /opt/dandiya-nights and /opt/lpu-nights, then pm2 restart both
