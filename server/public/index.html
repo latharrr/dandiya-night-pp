@@ -452,7 +452,8 @@ const CONFIG = {
   TIMES: ['17:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30','21:00','21:30','22:00'],
   MAX_PHOTOS: 5,                 // must match server MAX_PHOTOS
   GUEST_PEEK_LIMIT: 5,           // guests see at most this many people before making a pass
-  BOARD_SIZE: 20,                // top N per board get crowned; must match server BOARD_SIZE
+  BOARD_SIZE: 20,
+  ALLOW_OTHER_COLLEGE: true,                // top N per board get crowned; must match server BOARD_SIZE
   // North Campus colleges. Guys only see COLLEGES_COED; girls see both lists. Anything else: "Other college" + type it.
   COLLEGES_COED: ['Faculty of Management Studies (FMS Delhi)','Hansraj College','Hindu College','Kirori Mal College','Ramjas College','SGTB Khalsa College',
                   'Shri Ram College of Commerce',"St. Stephen's College",'Faculty of Law','DU department / DSE'],
@@ -1141,7 +1142,7 @@ SCREENS.ended = () => {
 SCREENS.college = () => {
   const g = myGender() || 'female';
   const cur = S.user?.college || '';
-  let pick = cur && !collegesFor(g).includes(cur) ? OTHER_COLLEGE : cur;
+  let pick = cur && collegesFor(g).includes(cur) ? cur : (CONFIG.ALLOW_OTHER_COLLEGE ? (cur ? OTHER_COLLEGE : cur) : (collegesFor(g)[0] || null));
   obFrame(`<h1 class="title">Which college<em>are you from?</em></h1>
     <div class="search">${IC.search}<input class="field" id="cs" placeholder="Search" aria-label="Search colleges" autocomplete="off"></div>
     <div class="choices list" id="opts" role="radiogroup" aria-label="College"></div>
@@ -1161,7 +1162,7 @@ SCREENS.college = () => {
   const draw = () => {
     const q = cs.value.trim().toLowerCase();
     const list = collegesFor(g).filter(c => !q || c.toLowerCase().includes(q));
-    $('#opts').innerHTML = [...list.map(c => [c, c]), [OTHER_COLLEGE, 'Other college']].map(([v, l], i) =>
+    $('#opts').innerHTML = [...list.map(c => [c, c]), ...(CONFIG.ALLOW_OTHER_COLLEGE ? [[OTHER_COLLEGE, 'Other college']] : [])].map(([v, l], i) =>
       `<button class="choice" role="radio" style="--i:${Math.min(i, 6)}" data-c="${esc(v)}" aria-checked="${pick === v}"><span><strong>${esc(l)}</strong></span><span class="tick">${IC.check}</span></button>`).join('');
     $$('#opts .choice').forEach(b => b.onclick = () => {
       pick = b.dataset.c; $$('#opts .choice').forEach(x => x.setAttribute('aria-checked', x === b));
