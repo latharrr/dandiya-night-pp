@@ -396,6 +396,7 @@ show = async function(){
     const d = await api('/api/admin/exhausted');
     const rows = d.rows || [];
     let h = '<p class="mut">Users at 0 right-swipe balance. Reset refills to 6.</p>';
+    if (rows.length) h += '<p><button id="exall">Reset ALL (' + rows.length + ') to 6 + WhatsApp them</button> <span class="mut" id="exallmsg"></span></p>';
     if (!rows.length) h += '<p>Nobody is exhausted right now.</p>';
     else {
       h += '<table><tr><th>Name</th><th>Phone</th><th>Picks today</th><th>Hit at (IST)</th><th></th></tr>' + rows.map(r => '<tr><td>'+esc(r.name||'')+'</td><td>'+esc(r.phone||'')+'</td><td>'+(r.usedToday||0)+'</td><td>'+(r.lastRight?ist(r.lastRight):'-')+'</td><td><button class="ghost exr" data-u="'+esc(r.id)+'">Reset to 6</button></td></tr>').join('') + '</table>';
@@ -403,8 +404,15 @@ show = async function(){
     m.innerHTML = h;
     m.querySelectorAll('.exr').forEach(b => b.onclick = async () => {
       b.disabled = true; b.textContent = '...';
-      try { const j = await waApiPost('/api/admin/limit-restore', {userId: b.dataset.u}); b.textContent = j.restored ? 'Reset done' : (j.reason || 'no-op'); } catch(e) { b.textContent = 'failed'; b.disabled = false; }
+      try { const j = await waApiPost('/api/admin/limit-restore', {userId: b.dataset.u}); b.textContent = j.restored ? (j.notified ? 'Reset + WA sent' : 'Reset done (no WA: ' + (j.notifyNote || '?') + ')') : (j.reason || 'no-op'); } catch(e) { b.textContent = 'failed'; b.disabled = false; }
     });
+    const __ab = $('#exall');
+    if (__ab) __ab.onclick = async () => {
+      if (!confirm('Reset ALL ' + rows.length + ' exhausted users to 6 AND WhatsApp each of them?')) return;
+      __ab.disabled = true; __ab.textContent = '...';
+      try { const j = await waApiPost('/api/admin/limit-restore-all', {}); $('#exallmsg').textContent = 'Reset ' + j.reset + ' users; WhatsApp messages going out spaced in background (check WA Log).'; __ab.textContent = 'Done'; }
+      catch(e) { $('#exallmsg').textContent = 'failed: ' + e.message; __ab.disabled = false; __ab.textContent = 'Reset ALL'; }
+    };
   } catch (e) { m.innerHTML = '<p class="err">'+esc(e.message)+'</p>'; }
 };
 </script>

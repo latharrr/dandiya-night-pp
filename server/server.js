@@ -1235,14 +1235,48 @@ route('POST', '/api/admin/remove-profile', ({req, url, body}) => {
   q('INSERT INTO events(ts,event,user_id,session_id,ref,data) VALUES(?,?,?,NULL,NULL,?)').run(now(), 'admin_remove_profile', uid, null);
   return {ok: true, removed: true};
 });
-route('POST', '/api/admin/limit-restore', ({req, url, body}) => {
+async function notifySwipeReset(u) {
+  try {
+    if (!u.phone) return {notified: false, reason: 'no phone'};
+    if (capped131026(u.phone)) { waLog(u.phone, 'reset', 'suppressed', '131026-cooldown'); return {notified: false, reason: 'suppressed-131026'}; }
+    await integrations.waTemplate(u.phone, ENV.WHATSAPP_RESET_TEMPLATE || 'dandiya_swipe_reset', ENV.WHATSAPP_RESET_LANG || 'en', [u.first_name || 'there', (ENV.APP_URL || 'https://dandiya.picapool.tech') + '/?swipe=1']);
+    return {notified: true};
+  } catch (e) { console.error('[resetNotify] FAILED to ...' + String(u.phone || '').slice(-4), e.message); return {notified: false, reason: e.message}; }
+}
+const __resetSleep = ms => new Promise(r => setTimeout(r, ms));
+route('POST', '/api/admin/limit-restore', async ({req, url, body}) => {
   admin(req, url);
   const id = String((body || {}).userId || ''); if (!id) bad('userId required');
   const u = q('SELECT id FROM users WHERE id=?').get(id); if (!u) bad('No such user.', 404);
   const __u = q('SELECT * FROM users WHERE id=?').get(id); const left = __u ? getRights(__u).balance : 0;
   if (left > 0) return {restored: false, reason: 'not exhausted', left};
   q('UPDATE users SET rb_balance=?, rb_next_refill=? WHERE id=?').run(C.RIGHT_CAP, now() + C.RIGHT_WINDOW_MS, id);
-  return {restored: true, granted: C.RIGHT_CAP, left: C.RIGHT_CAP};
+  const nres = await notifySwipeReset(__u);
+  q('INSERT INTO events(ts,event,user_id,session_id,ref,data) VALUES(?,?,?,NULL,NULL,?)').run(now(), 'admin_limit_restore', id, JSON.stringify({notified: nres.notified, note: nres.reason || null}));
+  return {restored: true, granted: C.RIGHT_CAP, left: C.RIGHT_CAP, notified: nres.notified, notifyNote: nres.reason || null};
+});
+route('POST', '/api/admin/limit-restore-all', async ({req, url, body}) => {
+  admin(req, url);
+  const testPhone = String((body || {}).testPhone || '');
+  if (testPhone) {
+    const nres = await notifySwipeReset({phone: testPhone, first_name: null});
+    return {test: true, notified: nres.notified, note: nres.reason || null, touched: 0};
+  }
+  const rows = q('SELECT id, phone, first_name FROM users WHERE completed_at IS NOT NULL AND rb_balance IS NOT NULL AND rb_balance <= 0').all();
+  if (!rows.length) return {reset: 0, messages: 'nobody exhausted'};
+  q('UPDATE users SET rb_balance=?, rb_next_refill=? WHERE rb_balance IS NOT NULL AND rb_balance <= 0').run(C.RIGHT_CAP, now() + C.RIGHT_WINDOW_MS);
+  q('INSERT INTO events(ts,event,user_id,session_id,ref,data) VALUES(?,?,?,NULL,NULL,?)').run(now(), 'admin_reset_all', null, JSON.stringify({count: rows.length, sample: rows.slice(0, 5).map(r => '...' + String(r.phone).slice(-4))}));
+  (async () => {
+    let sent = 0, failed = 0, suppressed = 0;
+    for (const r of rows) {
+      const n = await notifySwipeReset(r);
+      if (n.notified) sent++; else if (n.reason === 'suppressed-131026') suppressed++; else failed++;
+      await __resetSleep(1200);
+    }
+    q('INSERT INTO events(ts,event,user_id,session_id,ref,data) VALUES(?,?,?,NULL,NULL,?)').run(now(), 'admin_reset_all_notify', null, JSON.stringify({count: rows.length, sent, failed, suppressed}));
+    console.log('[resetAll] notify done sent:', sent, 'failed:', failed, 'suppressed:', suppressed);
+  })().catch(e => console.error('[resetAll]', e.message));
+  return {reset: rows.length, messages: 'sending spaced in background', sample: rows.slice(0, 5).map(r => '...' + String(r.phone).slice(-4))};
 });
 route('GET', '/api/admin/exhausted', ({req, url}) => {
   admin(req, url);
