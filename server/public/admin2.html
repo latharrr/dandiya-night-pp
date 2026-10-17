@@ -412,7 +412,7 @@ show = async function(){
     m.innerHTML = h;
     m.querySelectorAll('.exr').forEach(b => b.onclick = async () => {
       b.disabled = true; b.textContent = '...';
-      try { const j = await waApiPost('/api/admin/limit-restore', {userId: b.dataset.u}); b.textContent = j.restored ? (j.notified ? 'Reset + WA sent' : 'Reset done (no WA: ' + (j.notifyNote || '?') + ')') : (j.reason || 'no-op'); } refreshSendStatus(); } catch(e) { b.textContent = 'failed'; b.disabled = false; }
+      try { const j = await waApiPost('/api/admin/limit-restore', {userId: b.dataset.u}); b.textContent = j.restored ? (j.notified ? 'Reset + WA sent' : 'Reset done (no WA: ' + (j.notifyNote || '?') + ')') : (j.reason || 'no-op'); refreshSendStatus(); } catch(e) { b.textContent = 'failed'; b.disabled = false; }
     });
     const __ab = $('#exall');
     if (__ab) __ab.onclick = async () => {
