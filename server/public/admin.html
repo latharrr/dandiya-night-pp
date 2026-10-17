@@ -36,6 +36,7 @@ button.ghost{background:#fff;color:var(--ink)}
   <div class="row"><h1>Dandiya Nights · Admin</h1></div>
   <section class="row"><label for="key">Admin key</label><input id="key" type="password" autocomplete="off"><button id="load">Load</button><span class="err" id="err"></span></section>
   <section><h2>Numbers</h2><div class="kpis" id="kpis"><span class="muted">Enter the key and press Load.</span></div></section>
+    <section><h2>Sponsor clicks (Beats &amp; Dandiya)</h2><div class="kpis" id="sponsor"><span class="muted">Loads with the key.</span></div><table id="sponsorDays"></table></section>
   <section><h2>Top 20 check (before posting the nightly board)</h2>
     <div class="row" style="margin-bottom:10px"><select id="board"><option value="queen">Garba Queen</option><option value="king">Garba King</option></select>
     <select id="period"><option value="tonight">Tonight</option><option value="week">All Navratri</option></select><button class="ghost" id="loadTop">Show</button></div>
@@ -79,6 +80,10 @@ async function load() {
     $('#events').innerHTML = '<tr><th>Event</th><th>People</th></tr>' + (st.topEvents || []).map(r => `<tr><td>${esc(r.name)}</td><td>${r.count}</td></tr>`).join('');
     const rp = await api('/reports');
     $('#reports').innerHTML = rp.rows.length ? rp.rows.map(r => person(r, `<br><span class="muted">${r.reports} report(s): ${esc(r.reasons)}</span>`)).join('') : '<span class="muted">No open reports.</span>';
+    const sp = await api('/sponsor-stats');
+    const spName = {banner:'Home banner', board_title:'Board title', board_ad:'Board ad'};
+    $('#sponsor').innerHTML = k(sp.total, 'total sponsor clicks') + sp.byPlace.map(r => k(r.clicks, (spName[r.place] || r.place) + ' · ' + r.people + ' people')).join('');
+    $('#sponsorDays').innerHTML = sp.perDay.length ? '<tr><th>Day</th><th>Spot</th><th>Clicks</th><th>New</th><th>Returning</th></tr>' + sp.perDay.map(r => `<tr><td>${r.day}</td><td>${esc(spName[r.place] || r.place)}</td><td>${r.clicks}</td><td>${r.newClicks}</td><td>${r.returningClicks}</td></tr>`).join('') : '<tr><td class="muted">No clicks yet.</td></tr>';
     await loadTop();
   } catch (e) { $('#err').textContent = e.message; }
 }

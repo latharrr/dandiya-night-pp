@@ -1103,6 +1103,15 @@ route('GET', '/api/admin/engagement-overview', async ({ req, url }) => {
   const totalLogins = q(`SELECT COUNT(*) c FROM sessions`).get().c;
   return { users: totalUsers, totalOpens, totalViews, totalLogins, avgOpens: (totalOpens / totalUsers).toFixed(1), avgViews: (totalViews / totalUsers).toFixed(1), avgLogins: (totalLogins / totalUsers).toFixed(1) };
 });
+route('GET', '/api/admin/sponsor-stats', ({ req, url }) => {
+  admin(req, url);
+  const IST = `'+5 hours', '+30 minutes'`;
+  const W = `COALESCE(json_extract(data,'$.where'),'(unknown)')`;
+  const total = q(`SELECT COUNT(*) c FROM events WHERE event='sponsor_click'`).get().c;
+  const byPlace = q(`SELECT ${W} place, COUNT(*) clicks, COUNT(DISTINCT COALESCE(user_id, session_id)) people FROM events WHERE event='sponsor_click' GROUP BY place ORDER BY clicks DESC`).all();
+  const perDay = q(`WITH firsts AS (SELECT COALESCE(user_id, session_id, 'unknown') who, MIN(ts) first_ts FROM events GROUP BY who) SELECT date(e.ts/1000,'unixepoch',${IST}) day, COALESCE(json_extract(e.data,'$.where'),'(unknown)') place, COUNT(*) clicks, SUM(CASE WHEN date(f.first_ts/1000,'unixepoch',${IST}) = date(e.ts/1000,'unixepoch',${IST}) THEN 1 ELSE 0 END) newClicks, SUM(CASE WHEN date(f.first_ts/1000,'unixepoch',${IST}) < date(e.ts/1000,'unixepoch',${IST}) THEN 1 ELSE 0 END) returningClicks FROM events e JOIN firsts f ON f.who = COALESCE(e.user_id, e.session_id, 'unknown') WHERE e.event='sponsor_click' GROUP BY day, place ORDER BY day DESC, place LIMIT 90`).all();
+  return { total, byPlace, perDay };
+});
 require('./admin2.js')({ route, admin, q, bad });
 /* ---------------- admin ---------------- */
 function admin(req, url) {

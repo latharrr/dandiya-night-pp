@@ -887,7 +887,7 @@ SCREENS.landing = () => {
       <h1>Find your<em>Dandiya partner.</em></h1>
       <p class="sub">See who from North Campus is going to garba, pair up and dance together.</p>
     </div>
-    <a class="sponsor-banner" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener">
+    <a class="sponsor-banner" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener" onclick="track('sponsor_click',{where:'banner'})">
         <span class="sb-title">BEATS &amp; DANDIYA</span>
         <span class="sb-line">Marina Dreams, Ashok Vihar</span>
         <span class="sb-line">Nearest Metro: Shalimar Bagh Gate No. 4</span>
@@ -1798,7 +1798,7 @@ let lb = {board: null, period: 'tonight', prev: {}, timer: null};
 async function renderBoard() {
   lb.board ??= myBoardKey();
   app.innerHTML = `${demoFlag()}<section class="screen app">
-    <header class="head"><h1>${lb.board === 'queen' ? CONFIG.BOARD_NAME.female : '<a class="sponsor-h1" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener">BEATS &amp; DANDIYA</a>'}</h1>${tonightChip()}</header><a class="board-ad" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener"><span class="ad-tag">Sponsored</span>Beats &amp; Dandiya S2 · Sat 17 Oct · from Rs 150</a>
+    <header class="head"><h1>${lb.board === 'queen' ? CONFIG.BOARD_NAME.female : '<a class="sponsor-h1" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener" onclick="track('sponsor_click',{where:'board_title'})">BEATS &amp; DANDIYA</a>'}</h1>${tonightChip()}</header><a class="board-ad" href="https://greet.fydo.in/beats-dandiya-season-2" target="_blank" rel="noopener" onclick="track('sponsor_click',{where:'board_ad'})"><span class="ad-tag">Sponsored</span>Beats &amp; Dandiya S2 · Sat 17 Oct · from Rs 150</a>
     <div class="seg" role="group" aria-label="Board"><button data-b="queen" aria-pressed="${lb.board === 'queen'}">${CONFIG.BOARD_NAME.female}</button><button data-b="king" aria-pressed="${lb.board === 'king'}">${CONFIG.BOARD_NAME.male}</button></div>
     <div class="scroll pad">
       <div class="seg" role="group" aria-label="When" style="margin:0"><button data-p="tonight" aria-pressed="${lb.period === 'tonight'}">Tonight · ${esc(tonight().colour)}</button><button data-p="week" aria-pressed="${lb.period === 'week'}">All of Navratri</button></div>
