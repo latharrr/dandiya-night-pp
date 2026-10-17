@@ -1110,7 +1110,43 @@ route('GET', '/api/admin/sponsor-stats', ({ req, url }) => {
   const total = q(`SELECT COUNT(*) c FROM events WHERE event='sponsor_click'`).get().c;
   const byPlace = q(`SELECT ${W} place, COUNT(*) clicks, COUNT(DISTINCT COALESCE(user_id, session_id)) people FROM events WHERE event='sponsor_click' GROUP BY place ORDER BY clicks DESC`).all();
   const perDay = q(`WITH firsts AS (SELECT COALESCE(user_id, session_id, 'unknown') who, MIN(ts) first_ts FROM events GROUP BY who) SELECT date(e.ts/1000,'unixepoch',${IST}) day, COALESCE(json_extract(e.data,'$.where'),'(unknown)') place, COUNT(*) clicks, SUM(CASE WHEN date(f.first_ts/1000,'unixepoch',${IST}) = date(e.ts/1000,'unixepoch',${IST}) THEN 1 ELSE 0 END) newClicks, SUM(CASE WHEN date(f.first_ts/1000,'unixepoch',${IST}) < date(e.ts/1000,'unixepoch',${IST}) THEN 1 ELSE 0 END) returningClicks FROM events e JOIN firsts f ON f.who = COALESCE(e.user_id, e.session_id, 'unknown') WHERE e.event='sponsor_click' GROUP BY day, place ORDER BY day DESC, place LIMIT 90`).all();
-  return { total, byPlace, perDay };
+  return { total, byPlace, perDay, manual: kvGet('sponsor_manual') };
+});
+/* ---- hand-entered figures (one-time, locked) - real event data is never overwritten ---- */
+function kvGet(k) {
+  q(`CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`).run();
+  const r = q(`SELECT v FROM kv WHERE k=?`).get(k);
+  return r ? JSON.parse(r.v) : null;
+}
+function kvSetOnce(k, obj) {
+  q(`CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`).run();
+  if (q(`SELECT v FROM kv WHERE k=?`).get(k)) return false;
+  q(`INSERT INTO kv (k, v) VALUES (?, ?)`).run(k, JSON.stringify(obj));
+  return true;
+}
+route('GET', '/api/admin/night-stats', ({ req, url }) => {
+  admin(req, url);
+  const W0 = 1792175400000, W1 = 1792218600000; // 2026-10-17 00:00:00 to 12:00:00 IST
+  const firsts = q(`SELECT user_id u, MIN(ts) f FROM events WHERE user_id IS NOT NULL AND user_id != '' GROUP BY user_id`).all();
+  const fm = new Map(firsts.map(r => [r.u, r.f]));
+  const act = q(`SELECT DISTINCT user_id u FROM events WHERE ts>=? AND ts<? AND user_id IS NOT NULL AND user_id != ''`).all(W0, W1).map(r => r.u);
+  const nw = act.filter(u => fm.get(u) >= W0 && fm.get(u) < W1).length;
+  const ret = act.filter(u => fm.get(u) < W0).length;
+  return { window: '17 Oct 2026, 12:00 AM - 12:00 PM IST', active: act.length, newUsers: nw, returning: ret, manual: kvGet('night_stats_manual') };
+});
+route('POST', '/api/admin/night-stats-manual', ({ req, url, body }) => {
+  admin(req, url);
+  const n = Number(body && body.total);
+  if (!Number.isInteger(n) || n < 0 || n > 1000000) bad('bad number', 400);
+  if (!kvSetOnce('night_stats_manual', { total: n, enteredAt: Date.now() })) bad('already set - hand entry is one-time', 409);
+  return { ok: true };
+});
+route('POST', '/api/admin/sponsor-manual', ({ req, url, body }) => {
+  admin(req, url);
+  const n = Number(body && body.clicks);
+  if (!Number.isInteger(n) || n < 0 || n > 1000000) bad('bad number', 400);
+  if (!kvSetOnce('sponsor_manual', { clicks: n, window: '17 Oct 2026, 12:00 AM - 12:00 PM IST', enteredAt: Date.now() })) bad('already set - hand entry is one-time', 409);
+  return { ok: true };
 });
 require('./admin2.js')({ route, admin, q, bad });
 /* ---------------- admin ---------------- */

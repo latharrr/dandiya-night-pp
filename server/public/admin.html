@@ -36,7 +36,11 @@ button.ghost{background:#fff;color:var(--ink)}
   <div class="row"><h1>Dandiya Nights · Admin</h1></div>
   <section class="row"><label for="key">Admin key</label><input id="key" type="password" autocomplete="off"><button id="load">Load</button><span class="err" id="err"></span></section>
   <section><h2>Numbers</h2><div class="kpis" id="kpis"><span class="muted">Enter the key and press Load.</span></div></section>
-    <section><h2>Sponsor clicks (Beats &amp; Dandiya)</h2><div class="kpis" id="sponsor"><span class="muted">Loads with the key.</span></div><table id="sponsorDays"></table></section>
+    <section><h2>Last night 12 AM - 12 PM (17 Oct)</h2><div class="kpis" id="night"><span class="muted">Loads with the key.</span></div><div id="nightManual" style="margin-top:8px"></div></section>
+    <section><h2>Sponsor clicks (Beats &amp; Dandiya)</h2>
+    <h2 style="color:var(--orange)">Sponsor dashboard (hand-entered)</h2><div class="kpis" id="sponsorManual"><span class="muted">Loads with the key.</span></div><div id="sponsorManualForm" style="margin-top:8px"></div>
+    <h2 style="margin-top:12px">Tracked by app (natural clicks)</h2>
+    <div class="kpis" id="sponsor"><span class="muted">Loads with the key.</span></div><table id="sponsorDays"></table></section>
   <section><h2>Top 20 check (before posting the nightly board)</h2>
     <div class="row" style="margin-bottom:10px"><select id="board"><option value="queen">Garba Queen</option><option value="king">Garba King</option></select>
     <select id="period"><option value="tonight">Tonight</option><option value="week">All Navratri</option></select><button class="ghost" id="loadTop">Show</button></div>
@@ -84,6 +88,12 @@ async function load() {
     const spName = {banner:'Home banner', board_title:'Board title', board_ad:'Board ad'};
     $('#sponsor').innerHTML = k(sp.total, 'total sponsor clicks') + sp.byPlace.map(r => k(r.clicks, (spName[r.place] || r.place) + ' · ' + r.people + ' people')).join('');
     $('#sponsorDays').innerHTML = sp.perDay.length ? '<tr><th>Day</th><th>Spot</th><th>Clicks</th><th>New</th><th>Returning</th></tr>' + sp.perDay.map(r => `<tr><td>${r.day}</td><td>${esc(spName[r.place] || r.place)}</td><td>${r.clicks}</td><td>${r.newClicks}</td><td>${r.returningClicks}</td></tr>`).join('') : '<tr><td class="muted">No clicks yet.</td></tr>';
+    const fmtT = t => new Date(t).toLocaleString('en-IN', {timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'});
+    $('#sponsorManual').innerHTML = sp.manual ? k(sp.manual.clicks, 'clicks, 17 Oct 12 AM - 12 PM · hand-entered (locked)') + k(fmtT(sp.manual.enteredAt), 'entered at') : k('-', 'sponsor dashboard, 17 Oct 12 AM - 12 PM');
+    $('#sponsorManualForm').innerHTML = sp.manual ? '' : `<div class="row"><input id="spManIn" type="number" min="0" placeholder="clicks from sponsor dashboard"><button id="spManBtn">Save once</button><span class="muted">one-time, locks after save</span></div>`;
+    const ns = await api('/night-stats');
+    $('#night').innerHTML = k(ns.newUsers, 'new users · ' + ns.window) + k(ns.returning, 'returning users') + k(ns.active, 'total active (real, from app data)');
+    $('#nightManual').innerHTML = ns.manual ? `<div class="kpis">${k(ns.manual.total, 'hand-entered total (locked)') + k(fmtT(ns.manual.enteredAt), 'entered at')}</div>` : `<div class="row"><input id="nsManIn" type="number" min="0" placeholder="hand-entered total (sponsor-reported)"><button id="nsManBtn">Save once</button><span class="muted">one-time, locks after save; real figure stays above</span></div>`;
     await loadTop();
   } catch (e) { $('#err').textContent = e.message; }
 }
@@ -93,6 +103,8 @@ async function loadTop() {
   } catch (e) { $('#err').textContent = e.message; }
 }
 document.addEventListener('click', async e => {
+  if (e.target.id === 'spManBtn') { e.target.disabled = true; try { await api('/sponsor-manual', {method: 'POST', body: JSON.stringify({clicks: $('#spManIn').value})}); await load(); } catch (err) { $('#err').textContent = err.message; e.target.disabled = false; } return; }
+  if (e.target.id === 'nsManBtn') { e.target.disabled = true; try { await api('/night-stats-manual', {method: 'POST', body: JSON.stringify({total: $('#nsManIn').value})}); await load(); } catch (err) { $('#err').textContent = err.message; e.target.disabled = false; } return; }
   const b = e.target.closest('.hide'); if (!b) return;
   b.disabled = true;
   try { await api('/hide', {method: 'POST', body: JSON.stringify({userId: b.dataset.id, hidden: b.dataset.h === '1'})}); await load(); } catch (err) { $('#err').textContent = err.message; b.disabled = false; }
