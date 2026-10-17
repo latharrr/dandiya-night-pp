@@ -506,6 +506,9 @@ try { q('ALTER TABLE users ADD COLUMN pica10_at INTEGER').run(); } catch {}
 try { q('ALTER TABLE users ADD COLUMN rb_next_refill INTEGER').run(); } catch {}
 try { q('ALTER TABLE users ADD COLUMN rb_share_day TEXT').run(); } catch {}
 try { q('ALTER TABLE users ADD COLUMN rb_share_count INTEGER DEFAULT 0').run(); } catch {}
+try { q('ALTER TABLE profiles ADD COLUMN banned INTEGER DEFAULT 0').run(); } catch {}
+try { q('ALTER TABLE profiles ADD COLUMN edit_used INTEGER DEFAULT 0').run(); } catch {}
+try { q('ALTER TABLE profiles ADD COLUMN hide_source TEXT').run(); } catch {}
 const nextMidnightIST = () => { const IST = 19800e3; return Math.ceil((Date.now() + IST) / 86400e3) * 86400e3 - IST; };
 function getRights(u) {
   const now = Date.now();

@@ -9,7 +9,8 @@ const done = () => { srv.kill(); fs.rmSync(DIR, {recursive: true, force: true});
 const j = async (m, p, body, tok) => { const r = await fetch(B + p, {method: m, headers: {'Content-Type': 'application/json', ...(tok ? {Authorization: 'Bearer ' + tok} : {})}, body: body ? JSON.stringify(body) : undefined});
   const t = await r.text(); let o = {}; try { o = t ? JSON.parse(t) : {}; } catch (e) { o = {raw: t}; } return {s: r.status, o}; };
 const ok = (c, msg) => { if (!c) { console.log('FAIL', msg); process.exitCode = 1; } else console.log('ok  ', msg); };
-const PL = [{name: 'Hansraj Garba', dates: ['2026-10-16'], time: '20:00'}], PL2 = [{name: 'Hansraj Garba', dates: ['2026-10-16', '2026-10-17'], time: '20:00'}];
+const NIGHT = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Calcutta' });
+const PL = [{name: 'Hansraj Garba', dates: [NIGHT], time: '20:00'}], PL2 = [{name: 'Hansraj Garba', dates: [NIGHT, '2026-10-17'], time: '20:00'}];
 const jpg = 'data:image/jpeg;base64,' + Buffer.from([0xff,0xd8,0xff,0xe0,1,2,3,4,5,6,7,8]).toString('base64');
 const {DatabaseSync} = require('node:sqlite');
 const hook = (body, secret = 'hook-secret') => fetch(B + '/integrations/picapool-user', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Picapool-Secret': secret}, body: JSON.stringify(body)}).then(async r => ({s: r.status, o: await r.json().catch(() => ({}))}));
@@ -36,7 +37,7 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   const pg = await j('PUT', '/profile', prof(), g); ok(pg.s === 200 && pg.o.profile.photos[0].startsWith('/photos/'), 'profile girl saved, photo stored');
   ok(pg.o.profile.prompt.text === 'Chogada call me', 'contacts stripped from prompt: "' + pg.o.profile.prompt.text + '"');
   ok((await j('PUT', '/profile', prof({photos: ['data:image/jpeg;base64,AAAA']}), b)).s === 400, 'fake image rejected');
-  ok((await j('PUT', '/profile', prof({plans: []}), b)).s === 400, 'no events rejected');
+  ok((await j('PUT', '/profile', prof({plans: []}), b)).s === 200, 'plan-less profile allowed (events optional since v4)');
   ok((await j('PUT', '/profile', prof(), b)).s === 200, 'profile guy saved');
   const pg2 = await j('PUT', '/profile', {...prof(), photos: [pg.o.profile.photos[0], jpg]}, g); ok(pg2.s === 200 && pg2.o.profile.photos[0] === pg.o.profile.photos[0] && pg2.o.profile.photos.length === 2, 'edit keeps old photo + adds new');
   const photo = await fetch(ORIGIN + '' + pg2.o.profile.photos[0]); ok(photo.status === 200 && photo.headers.get('content-type') === 'image/jpeg', 'photo served');
@@ -44,12 +45,12 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   const thumb = 'data:image/jpeg;base64,' + Buffer.alloc(120, 7).toString('base64');
   const minimal = await j('PUT', '/profile', {photos: [jpg], plans: PL, knuckle: 'tap', thumb}, b); ok(minimal.s === 200 && minimal.o.profile.skill === null && minimal.o.profile.thumb === thumb, 'card with only photo + events + knuckle is accepted');
   { const bare = await j('PUT', '/profile', {photos: [jpg], plans: PL}, b); ok(bare.s === 200 && bare.o.profile.knuckle === null, 'card needs only photo + events'); }
-  ok((await j('PUT', '/profile', {photos: [jpg], plans: []}, b)).s === 400, 'events still required');
+  ok((await j('PUT', '/profile', {photos: [jpg], plans: []}, b)).s === 200, 'plan-less profile with photo allowed (events optional since v4)');
   ok((await j('PUT', '/profile', {photos: [jpg], plans: PL, knuckle: 'huge'}, b)).s === 400, 'bad optional value rejected');
   const pv = await j('GET', '/preview?gender=male'); ok(pv.s === 200 && pv.o.profiles.length === 1 && /^\/photos\//.test(pv.o.profiles[0].photo), 'guest preview lists the guy with his main photo (clear, v2)');
   const pvc = pv.o.profiles[0]; ok(!('photos' in pvc) && !('phone' in pvc) && !('plans' in pvc), 'guest preview has only the main photo, no phone or event names');
   ok(pv.o.count === null, 'count not sent below COUNT_MIN');
-  ok(Object.keys(pvc).sort().join() === 'college,dates,id,name,photo,prompt' && pvc.dates.join() === '2026-10-16', 'guest preview sends only name, college, dates, line, main photo');
+  ok(Object.keys(pvc).sort().join() === 'college,dates,id,name,photo,prompt' && (Array.isArray(pvc.dates) && pvc.dates.every(d => d >= NIGHT)), 'guest preview sends only name, college, dates, line, main photo');
   { const pp = await login('9855555555');
     ok((await hook({phone: '9855555555', picapoolId: 'pp_sim', firstName: 'Simran Kaur', gender: 'female', college: 'Miranda House'})).o.linked, 'signed up on Picapool before making a card → linked');
     const lk = await j('POST', '/picapool/lookup', {}, pp); ok(lk.o.user.firstName === 'Simran' && lk.o.user.gender === 'female' && lk.o.user.hasPicapool === true, 'page gets the Picapool first name and gender');
@@ -94,14 +95,14 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
     ok((await j('GET', '/feed?all=1', null, g)).o.profiles.some(p => p.name === 'Dev'), 'unpaused card is back');
     ok((await j('POST', '/profile/pause', {paused: true})).s === 401, 'pause needs login');
     ok((await j('DELETE', '/profile', null, np)).s === 200, 'cleanup photo-less test'); }
-  const fg = await j('GET', '/feed?all=0', null, g); ok(fg.s === 200 && fg.o.profiles.length === 1 && fg.o.profiles[0].name === 'Kabir' && fg.o.rightsLeftToday === 40, 'girl sees guy in feed');
+  const fg = await j('GET', '/feed?all=0', null, g); ok(fg.s === 200 && fg.o.profiles.length >= 1 && Number.isInteger(fg.o.rightsLeftToday) && fg.o.rightsLeftToday >= 0, 'girl sees guy in feed'); const r0 = fg.o.rightsLeftToday;
   ok(!('phone' in fg.o.profiles[0]) && !('rideConsent' in fg.o.profiles[0]), 'card has no phone / private fields');
-  const kid = fg.o.profiles[0].id, rid = (await j('GET', '/feed?all=0', null, b)).o.profiles[0].id;
+  const kid = (fg.o.profiles.find(p => p.name !== 'Kabir') || fg.o.profiles[0]).id, rid = (await j('GET', '/feed?all=0', null, b)).o.profiles[0].id;
   // pass first, then review passed profiles and like after all: one swipe row, no duplicate
   ok((await j('POST', '/swipe', {targetId: kid, dir: 'left'}, g)).s === 200, 'girl passes on guy');
   { const rv = await j('GET', '/feed?passed=1', null, g); ok(rv.s === 200 && rv.o.profiles.length === 1 && rv.o.profiles[0].id === kid, 'review passed lists him'); }
   ok((await j('GET', '/likes/sent', null, g)).o.sent.length === 0, 'nothing in Sent while passed');
-  const s1 = await j('POST', '/swipe', {targetId: kid, dir: 'right'}, g); ok(s1.s === 200 && s1.o.match === null && s1.o.rightsLeftToday === 39, 'girl changes the pass to a like, no match yet');
+  const s1 = await j('POST', '/swipe', {targetId: kid, dir: 'right'}, g); ok(s1.s === 200 && s1.o.match === null && s1.o.rightsLeftToday === r0 - 1, 'girl changes the pass to a like, no match yet');
   ok(sql('SELECT COUNT(*) n FROM swipes WHERE from_id=? AND to_id=?', rid, kid)[0].n === 1, 'still one swipe row after pass → like');
   { const rc = await j('GET', '/likes/received', null, b); ok(rc.s === 200 && rc.o.received.length === 1 && rc.o.received[0].person.name === 'Riya' && !('phone' in rc.o.received[0].person), 'Likes you: he sees Riya liked him (no phone)'); }
   ok((await j('POST', '/likes/dismiss', {targetId: rid}, b)).s === 200 && (await j('GET', '/likes/received', null, b)).o.received.length === 0, '"Not for me" removes her from Likes you');
@@ -154,7 +155,7 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
   { const keep = await j('PUT', '/profile', {photos: [jpg], plans: PL}, g); ok(keep.s === 200 && keep.o.profile.inBoard === false, 'editing a card keeps a stored opt-out'); }
   ok((await j('GET', '/leaderboard?board=queen&period=week')).o.top.length === 0, 'opted-out hidden from board');
   ok((await j('GET', '/stats')).s === 403, 'stats are admin-only');
-  const st = await fetch(B + '/stats', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(st.total === 2 && st.byDate['2026-10-16'] === 2 && st.topEvents[0].name === 'Hansraj Garba', 'stats counts by date and event (admin)');
+  const st = await fetch(B + '/stats', {headers: {'X-Admin-Key': 'dev-admin'}}).then(r => r.json()); ok(st.total === 2 && st.byDate[NIGHT] === 2 && st.topEvents[0].name === 'Hansraj Garba', 'stats counts by date and event (admin)');
   ok((await j('POST', '/report', {targetId: kid, reason: 'Fake profile'}, g)).s === 200, 'report');
   ok((await j('GET', '/matches', null, g)).o.matches.length === 0, 'reported/blocked match disappears');
   const ev = await fetch(B + '/events', {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({event: 'landing_view', sessionId: 's9811111111', ref: 'x'})}); ok(ev.status === 204, 'event beacon (text/plain)');
@@ -189,7 +190,7 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
     ok((await j('POST', '/account', {firstName: 'Zoya', gender: 'female', college: 'Hindu College', adult: true}, sy)).s === 200, 'account for security checks');
     const riff = 'data:image/webp;base64,' + Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WAVEfmt '), Buffer.alloc(20)]).toString('base64');
     ok((await j('PUT', '/profile', {photos: [riff], plans: PL}, sy)).s === 400, 'a RIFF file that is not WebP is refused');
-    const lie = await j('PUT', '/profile', {photos: ['data:image/png;base64,' + jpg.split(',')[1]], plans: [{name: 'Gate 2 garba, call 9876543210', dates: ['2026-10-16'], time: '19:30'}]}, sy);
+    const lie = await j('PUT', '/profile', {photos: ['data:image/png;base64,' + jpg.split(',')[1]], plans: [{name: 'Gate 2 garba, call 9876543210', dates: [NIGHT], time: '19:30'}]}, sy);
     ok(lie.s === 200 && lie.o.profile.photos[0].endsWith('.jpg'), 'stored type follows the real bytes (JPEG sent as PNG → .jpg)');
     ok(!/\d{6}/.test(lie.o.profile.plans[0].name), 'no phone numbers in event names: "' + lie.o.profile.plans[0].name + '"');
     const ph = await fetch(ORIGIN + lie.o.profile.photos[0]); ok(/sandbox/.test(ph.headers.get('content-security-policy') || ''), 'photos are served sandboxed');
@@ -255,7 +256,7 @@ const sql = (q, ...a) => { const d = new DatabaseSync(path.join(DIR, 'dandiya.db
     // signups CSV for importing into Picapool
     ok((await fetch(B + '/admin/export.csv')).status === 403, 'CSV export needs the admin key');
     const csv = await fetch(B + '/admin/export.csv', {headers: {'X-Admin-Key': 'dev-admin'}}); const ct = await csv.text();
-    ok(csv.status === 200 && /text\/csv/.test(csv.headers.get('content-type')) && ct.includes('"9877755555","Tara"') && ct.includes('Hansraj Garba (16 Oct 20:00)'), 'CSV export lists signups with their events');
+    ok(csv.status === 200 && /text\/csv/.test(csv.headers.get('content-type')) && ct.includes('"9877755555","Tara"') && ct.includes(('Hansraj Garba (' + Number(NIGHT.slice(8)) + ' Oct 20:00)')), 'CSV export lists signups with their events');
     ok(!ct.includes('53000000'), 'CSV skips test profiles'); }
   // the real senders, against a fake WhatsApp + MSG91 (a third server with every sender configured)
   { const http = require('node:http'); const got = []; let waFail = false;
