@@ -1167,6 +1167,21 @@ route('POST', '/api/admin/installly', ({ req, url, body }) => {
   kvSet('installly', { clicks, installs, cvr, updatedAt: Date.now() });
   return { ok: true };
 });
+/* ---- last-send status per WhatsApp action type (from real wa_log rows) ---- */
+route('GET', '/api/admin/send-status', ({ req, url }) => {
+  admin(req, url);
+  const out = {};
+  for (const t of ['reset', 'nudge', 'broadcast']) {
+    const lr = q(`SELECT MAX(ts) m FROM wa_log WHERE type=?`).get(t);
+    const last = lr && lr.m;
+    if (!last) { out[t] = null; continue; }
+    const rows = q(`SELECT status, COUNT(*) c FROM wa_log WHERE type=? AND ts>=? GROUP BY status`).all(t, last - 600000);
+    let ok = 0, failed = 0, other = 0, total = 0;
+    for (const r of rows) { total += r.c; if (r.status === 'sent') ok += r.c; else if (/fail|suppress/.test(r.status)) failed += r.c; else other += r.c; }
+    out[t] = { lastTs: last, total, ok, failed, other };
+  }
+  return out;
+});
 require('./admin2.js')({ route, admin, q, bad });
 /* ---------------- admin ---------------- */
 function admin(req, url) {

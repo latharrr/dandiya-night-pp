@@ -135,6 +135,13 @@ drawTabs();if(KEY)show();
 <script>
 /* batch 2026-10-16: WA master toggle, per-user mute, nudge button, broadcast, engagement, WA log */
 function waApiPost(pp, body) { return fetch(pp, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': KEY }, body: JSON.stringify(body || {}) }).then(r => r.json()); }
+async function refreshSendStatus() {
+  let r; try { r = await api('/api/admin/send-status'); } catch (e) { return; }
+  document.querySelectorAll('.lsnd').forEach(el => {
+    const st = r[el.dataset.t];
+    el.textContent = st ? ('Last sent: ' + ist(st.lastTs) + ' - ' + st.ok + ' ok' + (st.failed ? ', ' + st.failed + ' failed/suppressed' : '') + (st.other ? ', ' + st.other + ' queued/other' : '')) : 'Last sent: never';
+  });
+}
 function waPanel() {
   let dd = document.querySelector('#waPanel');
   if (!dd) { dd = document.createElement('div'); dd.id = 'waPanel'; dd.style.cssText = 'position:fixed;right:16px;top:60px;width:430px;max-height:80vh;overflow:auto;background:#fff;border:2px solid #000;border-radius:12px;padding:14px;z-index:99;display:none;font-size:13px'; document.body.appendChild(dd); }
@@ -157,7 +164,7 @@ async function loadQueueTable() {
 }
 async function showBroadcast() {
   const dd = waPanel(); dd.style.display = 'block';
-  dd.innerHTML = `<h3>Post-event broadcast</h3><p class="mut">Manual send only. {{name}} merges first name. Free-form sends only reach users who messaged us in the last 24h; everyone else queues for template approval.</p><textarea id="bcMsg" rows="4" style="width:100%" placeholder="Hi {{name}}! ..."></textarea><div style="margin:8px 0"><button id="bcPrev">Preview audience</button> <button id="bcSend">Send broadcast</button></div><div id="bcRes" class="mut"></div><h4>Queued sends</h4><div id="bcQueue">...</div><button id="bcFlush">Flush queue</button> <button id="bcClose">Close</button>`;
+  dd.innerHTML = `<h3>Post-event broadcast</h3><p class="mut">Manual send only. {{name}} merges first name. Free-form sends only reach users who messaged us in the last 24h; everyone else queues for template approval.</p><textarea id="bcMsg" rows="4" style="width:100%" placeholder="Hi {{name}}! ..."></textarea><div style="margin:8px 0"><button id="bcPrev">Preview audience</button> <button id="bcSend">Send broadcast</button></div><div id="bcRes" class="mut"></div><div class="mut lsnd" data-t="broadcast"></div><h4>Queued sends</h4><div id="bcQueue">...</div><button id="bcFlush">Flush queue</button> <button id="bcClose">Close</button>`;
   document.querySelector('#bcClose').onclick = () => dd.style.display = 'none';
   document.querySelector('#bcPrev').onclick = async () => { const r = await api('/api/admin/broadcast-preview'); document.querySelector('#bcRes').textContent = 'Audience: ' + r.total + ' signed-up users - ' + r.inWindow + ' in 24h window (send now), ' + r.queued + ' would queue'; };
   document.querySelector('#bcSend').onclick = async () => {
@@ -167,9 +174,9 @@ async function showBroadcast() {
     document.querySelector('#bcRes').textContent = 'Sending...';
     const r = await waApiPost('/api/admin/broadcast', { message });
     document.querySelector('#bcRes').textContent = r.message || JSON.stringify(r);
-    loadQueueTable();
+    loadQueueTable(); refreshSendStatus();
   };
-  document.querySelector('#bcFlush').onclick = async () => { const r = await waApiPost('/api/admin/queue-flush'); document.querySelector('#bcRes').textContent = 'flush: sent ' + r.sent + ', still queued ' + r.stillQueued + ', failed ' + r.failed; loadQueueTable(); };
+  document.querySelector('#bcFlush').onclick = async () => { const r = await waApiPost('/api/admin/queue-flush'); document.querySelector('#bcRes').textContent = 'flush: sent ' + r.sent + ', still queued ' + r.stillQueued + ', failed ' + r.failed; loadQueueTable(); refreshSendStatus(); };
   loadQueueTable();
 }
 async function showWaLog() {
@@ -196,13 +203,13 @@ async function injectNudge() {
   if (!h) return;
   let r; try { r = await api('/api/admin/no-photo-users'); } catch (e) { return; }
   const bar = document.createElement('div'); bar.id = 'nudgeBar'; bar.style.margin = '8px 0';
-  bar.innerHTML = `<button id="nudgeGo">Nudge ${r.count} no-photo users on WhatsApp</button> <span id="nudgeRes" class="mut"></span>`;
+  bar.innerHTML = `<button id="nudgeGo">Nudge ${r.count} no-photo users on WhatsApp</button> <span id="nudgeRes" class="mut"></span> <span class="lsnd mut" data-t="nudge"></span>`;
   h.parentNode.insertBefore(bar, h.nextSibling);
   document.querySelector('#nudgeGo').onclick = async () => {
     if (!confirm('Nudge ' + r.count + ' no-photo users?')) return;
     document.querySelector('#nudgeRes').textContent = ' working...';
     const rr = await waApiPost('/api/admin/nudge-nophoto');
-    document.querySelector('#nudgeRes').textContent = ' ' + (rr.message || JSON.stringify(rr));
+    document.querySelector('#nudgeRes').textContent = ' ' + (rr.message || JSON.stringify(rr)); refreshSendStatus();
   };
 }
 async function injectOverview() {
@@ -225,6 +232,7 @@ document.addEventListener('click', e => {
   setTimeout(() => injectUserExtras(uid), 900);
 });
 setTimeout(initWaControls, 800);
+setTimeout(refreshSendStatus, 1200);
 setTimeout(initWaControls, 2500);
 </script>
 
@@ -396,7 +404,7 @@ show = async function(){
     const d = await api('/api/admin/exhausted');
     const rows = d.rows || [];
     let h = '<p class="mut">Users at 0 right-swipe balance. Reset refills to 6.</p>';
-    if (rows.length) h += '<p><button id="exall">Reset ALL (' + rows.length + ') to 6 + WhatsApp them</button> <span class="mut" id="exallmsg"></span></p>';
+    if (rows.length) h += '<p><button id="exall">Reset ALL (' + rows.length + ') to 6 + WhatsApp them</button> <span class="mut" id="exallmsg"></span> <span class="lsnd mut" data-t="reset"></span></p>';
     if (!rows.length) h += '<p>Nobody is exhausted right now.</p>';
     else {
       h += '<table><tr><th>Name</th><th>Phone</th><th>Picks today</th><th>Hit at (IST)</th><th></th></tr>' + rows.map(r => '<tr><td>'+esc(r.name||'')+'</td><td>'+esc(r.phone||'')+'</td><td>'+(r.usedToday||0)+'</td><td>'+(r.lastRight?ist(r.lastRight):'-')+'</td><td><button class="ghost exr" data-u="'+esc(r.id)+'">Reset to 6</button></td></tr>').join('') + '</table>';
@@ -404,13 +412,13 @@ show = async function(){
     m.innerHTML = h;
     m.querySelectorAll('.exr').forEach(b => b.onclick = async () => {
       b.disabled = true; b.textContent = '...';
-      try { const j = await waApiPost('/api/admin/limit-restore', {userId: b.dataset.u}); b.textContent = j.restored ? (j.notified ? 'Reset + WA sent' : 'Reset done (no WA: ' + (j.notifyNote || '?') + ')') : (j.reason || 'no-op'); } catch(e) { b.textContent = 'failed'; b.disabled = false; }
+      try { const j = await waApiPost('/api/admin/limit-restore', {userId: b.dataset.u}); b.textContent = j.restored ? (j.notified ? 'Reset + WA sent' : 'Reset done (no WA: ' + (j.notifyNote || '?') + ')') : (j.reason || 'no-op'); } refreshSendStatus(); } catch(e) { b.textContent = 'failed'; b.disabled = false; }
     });
     const __ab = $('#exall');
     if (__ab) __ab.onclick = async () => {
       if (!confirm('Reset ALL ' + rows.length + ' exhausted users to 6 AND WhatsApp each of them?')) return;
       __ab.disabled = true; __ab.textContent = '...';
-      try { const j = await waApiPost('/api/admin/limit-restore-all', {}); $('#exallmsg').textContent = 'Reset ' + j.reset + ' users; WhatsApp messages going out spaced in background (check WA Log).'; __ab.textContent = 'Done'; }
+      try { const j = await waApiPost('/api/admin/limit-restore-all', {}); $('#exallmsg').textContent = 'Reset ' + j.reset + ' users; WhatsApp messages going out spaced in background (check WA Log).'; __ab.textContent = 'Done'; refreshSendStatus(); }
       catch(e) { $('#exallmsg').textContent = 'failed: ' + e.message; __ab.disabled = false; __ab.textContent = 'Reset ALL'; }
     };
   } catch (e) { m.innerHTML = '<p class="err">'+esc(e.message)+'</p>'; }
