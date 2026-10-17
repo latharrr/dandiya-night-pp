@@ -982,9 +982,14 @@ route('GET', '/api/admin/no-photo-users', async ({ req, url }) => { admin(req, u
 route('POST', '/api/admin/nudge-nophoto', async ({ req, url }) => {
   admin(req, url);
   const rows = noPhotoUsers();
+  // 2026-10-17 dedupe: skip anyone nudged (sent) in the last 72h or already sitting in the pending queue
+  const nudged72 = new Set(q(`SELECT DISTINCT phone FROM wa_log WHERE type='nudge' AND status='sent' AND ts > ?`).all(now() - 259200000).map(r => String(r.phone || '').replace(/\D/g, '').slice(-10)));
+  const pendingQ = new Set(q(`SELECT user_id FROM outbound_queue WHERE status='pending' AND kind='nudge'`).all().map(r => r.user_id));
+  const fresh = rows.filter(u => !nudged72.has(String(u.phone || '').replace(/\D/g, '').slice(-10)) && !pendingQ.has(u.id));
+  const skippedRecent = rows.length - fresh.length;
   const base = process.env.APP_URL || 'https://dandiya.picapool.tech';
   let sentNow = 0, queued = 0, gated = 0, failed = 0;
-  for (const u of rows) {
+  for (const u of fresh) {
     const text = `Hi ${u.first_name}! Your Dandiya Night profile is live but has no photo - profiles with photos get way more matches. Add yours here: ${base}`;
     if (u.last_wa_inbound && now() - u.last_wa_inbound < 86400000) {
       const r = await integrations.waText(u.phone, text, 'nudge');
@@ -996,7 +1001,7 @@ route('POST', '/api/admin/nudge-nophoto', async ({ req, url }) => {
       queued++;
     }
   }
-  return { ok: true, sentNow, queued, gated, total: rows.length, message: `nudged ${sentNow} now, ${queued} queued for template approval${gated ? `, ${gated} gated (master off)` : ''}${failed ? `, ${failed} failed` : ''}` };
+  return { ok: true, sentNow, queued, gated, skippedRecent, total: rows.length, message: `nudged ${sentNow} now, ${queued} queued for template approval, ${skippedRecent} skipped (nudged <72h or already queued)${gated ? `, ${gated} gated (master off)` : ''}${failed ? `, ${failed} failed` : ''}` };
 });
 route('GET', '/api/admin/broadcast-preview', async ({ req, url }) => {
   admin(req, url);
