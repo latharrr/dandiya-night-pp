@@ -2246,9 +2246,15 @@ function blockedSheet() {
   });
 }
 
-(function boot() {
+(async function boot() {
   try { track('app_open'); } catch (e) {}
   if (isDemo()) app.classList.add('is-demo');
+  if (!S.token && !isDemo()) {
+    try {
+      const r = await api.req('GET', '/me');
+      if (r && r.token) { S.token = r.token; S.user = r.user || null; S.profile = r.profile || null; S.picapool = null; save(); track('sess_cookie'); }
+    } catch (e) {}
+  }
   if (S.ageBlocked) return go('blocked');
   if (!upcomingNights().length) return go('ended');
   if (S.token) setTimeout(() => syncPicapool(true), 1500);

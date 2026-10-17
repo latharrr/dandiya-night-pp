@@ -195,7 +195,7 @@ function rateLimit(req) {
 }
 setInterval(() => { const t = now(); for (const [k, w] of hits) if (t - w.start > w.win * 2) hits.delete(k); }, 60e3).unref();
 function authUser(req, required = true) {
-  const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
+  const m = /^Bearer (.+)$/.exec(req.headers.authorization || '') || /(?:^|;\s*)dn_sess=([^\s;]+)/.exec(req.headers.cookie || '');
   const s = m && q('SELECT user_id FROM sessions WHERE token_hash=? AND created_at>?').get(sha(m[1]), now() - C.SESSION_DAYS * 86400e3);
   const u = s && q('SELECT * FROM users WHERE id=?').get(s.user_id);
   if (!u && required) bad('Please log in again.', 401);
@@ -289,7 +289,7 @@ route('POST', '/api/auth/otp', async ({req, body}) => {
   return {ok: true, via: via || 'whatsapp', alt: integrations.otpChannels().find(c => c !== via) || null};
 });
 
-route('POST', '/api/auth/verify', async ({req, body}) => {
+route('POST', '/api/auth/verify', async ({req, res, body}) => {
   const phone = String(body.phone || ''), code = String(body.code || '');
   hit('verify:' + clientIp(req), 3600e3, C.VERIFY_PER_IP_HOUR, 'Too many tries from this network. Try again in a while.');
   const o = q('SELECT * FROM otps WHERE phone=?').get(phone);
@@ -309,14 +309,22 @@ route('POST', '/api/auth/verify', async ({req, body}) => {
   const token = crypto.randomBytes(32).toString('base64url');
   q('INSERT INTO sessions(token_hash, user_id, created_at) VALUES(?,?,?)').run(sha(token), u.id, now());
   const known = u.first_name || u.picapool_id;
+  res.setHeader('Set-Cookie', 'dn_sess=' + token + '; Max-Age=2592000; Path=/; HttpOnly; Secure; SameSite=Lax');
   return {token, user: known ? userJson(u) : null, profile: profileOf(u.id)};
 });
 
 /* Log out: this session stops working everywhere at once */
-route('POST', '/api/auth/logout', ({req}) => {
-  const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
+route('POST', '/api/auth/logout', ({req, res}) => {
+  const m = /^Bearer (.+)$/.exec(req.headers.authorization || '') || /(?:^|;\s*)dn_sess=([^\s;]+)/.exec(req.headers.cookie || '');
   if (m) q('DELETE FROM sessions WHERE token_hash=?').run(sha(m[1]));
+  res.setHeader('Set-Cookie', 'dn_sess=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax');
   return {ok: true};
+});
+route('GET', '/api/me', ({req}) => {
+  const m = /^Bearer (.+)$/.exec(req.headers.authorization || '') || /(?:^|;\s*)dn_sess=([^\s;]+)/.exec(req.headers.cookie || '');
+  const u = authUser(req);
+  const known = u.first_name || u.picapool_id;
+  return {token: m[1], user: known ? userJson(u) : null, profile: profileOf(u.id)};
 });
 
 /* ---------- Picapool account sync ----------
