@@ -1148,6 +1148,25 @@ route('POST', '/api/admin/sponsor-manual', ({ req, url, body }) => {
   if (!kvSetOnce('sponsor_manual', { clicks: n, window: '17 Oct 2026, 12:00 AM - 12:00 PM IST', enteredAt: Date.now() })) bad('already set - hand entry is one-time', 409);
   return { ok: true };
 });
+/* ---- Installly "Download app" link figures - hand-entered from Installly dashboard, updatable, never part of tracked numbers ---- */
+function kvSet(k, obj) {
+  q(`CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)`).run();
+  q(`INSERT INTO kv (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v`).run(k, JSON.stringify(obj));
+}
+route('GET', '/api/admin/installly', ({ req, url }) => {
+  admin(req, url);
+  return { link: 'picapool.installly.io/qi153a', data: kvGet('installly') };
+});
+route('POST', '/api/admin/installly', ({ req, url, body }) => {
+  admin(req, url);
+  const clicks = Number(body && body.clicks), installs = Number(body && body.installs);
+  const cvr = String((body && body.cvr) || '').trim().slice(0, 20);
+  if (!Number.isInteger(clicks) || clicks < 0 || clicks > 100000000) bad('bad clicks', 400);
+  if (!Number.isInteger(installs) || installs < 0 || installs > 100000000) bad('bad installs', 400);
+  if (!cvr) bad('bad cvr', 400);
+  kvSet('installly', { clicks, installs, cvr, updatedAt: Date.now() });
+  return { ok: true };
+});
 require('./admin2.js')({ route, admin, q, bad });
 /* ---------------- admin ---------------- */
 function admin(req, url) {

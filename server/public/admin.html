@@ -37,6 +37,7 @@ button.ghost{background:#fff;color:var(--ink)}
   <section class="row"><label for="key">Admin key</label><input id="key" type="password" autocomplete="off"><button id="load">Load</button><span class="err" id="err"></span></section>
   <section><h2>Numbers</h2><div class="kpis" id="kpis"><span class="muted">Enter the key and press Load.</span></div></section>
     <section><h2>Last night 12 AM - 12 PM (17 Oct)</h2><div class="kpis" id="night"><span class="muted">Loads with the key.</span></div><div id="nightManual" style="margin-top:8px"></div></section>
+    <section><h2>Download app button (Installly dashboard, hand-entered)</h2><div class="kpis" id="installly"><span class="muted">Loads with the key.</span></div><div id="installlyForm" style="margin-top:8px"></div></section>
     <section><h2>Sponsor clicks (Beats &amp; Dandiya)</h2>
     <h2 style="color:var(--orange)">Sponsor dashboard (hand-entered)</h2><div class="kpis" id="sponsorManual"><span class="muted">Loads with the key.</span></div><div id="sponsorManualForm" style="margin-top:8px"></div>
     <h2 style="margin-top:12px">Tracked by app (natural clicks)</h2>
@@ -94,6 +95,10 @@ async function load() {
     const ns = await api('/night-stats');
     $('#night').innerHTML = k(ns.newUsers, 'new users · ' + ns.window) + k(ns.returning, 'returning users') + k(ns.active, 'total active (real, from app data)');
     $('#nightManual').innerHTML = ns.manual ? `<div class="kpis">${k(ns.manual.total, 'hand-entered total (locked)') + k(fmtT(ns.manual.enteredAt), 'entered at')}</div>` : `<div class="row"><input id="nsManIn" type="number" min="0" placeholder="hand-entered total (sponsor-reported)"><button id="nsManBtn">Save once</button><span class="muted">one-time, locks after save; real figure stays above</span></div>`;
+    const il = await api('/installly');
+    const d = il.data || {};
+    $('#installly').innerHTML = il.data ? k(d.clicks, 'clicks') + k(d.installs, 'installs') + k(d.cvr, 'CVR') + k(fmtT(d.updatedAt), 'last updated') : k('-', 'no entry yet');
+    $('#installlyForm').innerHTML = `<div class="row"><input id="ilClicks" type="number" min="0" placeholder="clicks" value="${il.data ? d.clicks : ''}"><input id="ilInstalls" type="number" min="0" placeholder="installs" value="${il.data ? d.installs : ''}"><input id="ilCvr" placeholder="CVR e.g. 20%" value="${il.data ? esc(d.cvr) : ''}"><button id="ilBtn">Save</button><span class="muted">from Installly dashboard (picapool.installly.io/qi153a); saving updates values + timestamp; not part of app-tracked numbers</span></div>`;
     await loadTop();
   } catch (e) { $('#err').textContent = e.message; }
 }
@@ -105,6 +110,7 @@ async function loadTop() {
 document.addEventListener('click', async e => {
   if (e.target.id === 'spManBtn') { e.target.disabled = true; try { await api('/sponsor-manual', {method: 'POST', body: JSON.stringify({clicks: $('#spManIn').value})}); await load(); } catch (err) { $('#err').textContent = err.message; e.target.disabled = false; } return; }
   if (e.target.id === 'nsManBtn') { e.target.disabled = true; try { await api('/night-stats-manual', {method: 'POST', body: JSON.stringify({total: $('#nsManIn').value})}); await load(); } catch (err) { $('#err').textContent = err.message; e.target.disabled = false; } return; }
+  if (e.target.id === 'ilBtn') { e.target.disabled = true; try { await api('/installly', {method: 'POST', body: JSON.stringify({clicks: $('#ilClicks').value, installs: $('#ilInstalls').value, cvr: $('#ilCvr').value})}); await load(); } catch (err) { $('#err').textContent = err.message; e.target.disabled = false; } return; }
   const b = e.target.closest('.hide'); if (!b) return;
   b.disabled = true;
   try { await api('/hide', {method: 'POST', body: JSON.stringify({userId: b.dataset.id, hidden: b.dataset.h === '1'})}); await load(); } catch (err) { $('#err').textContent = err.message; b.disabled = false; }
