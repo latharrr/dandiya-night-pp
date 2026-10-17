@@ -108,10 +108,10 @@ After any change: `python3 source/build.py` → `cd server && npm test` → comm
 - POST /api/wa-webhook: inbound messages update users.last_wa_inbound (24h customer-service-window tracking); message status callbacks log to wa_log
 - X-Hub-Signature-256 enforced when WHATSAPP_APP_SECRET is set in .env (permissive until it is)
 
-### Clone setup (lpu.picapool.tech)
-- /opt/lpu-nights mirrors the same server/ tree; its own .env (PORT 8096, DATA_DIR /var/lib/lpu-nights, APP_URL https://lpu.picapool.tech, clone ADMIN_KEY) stays out of git
+### LPU app (lpu.picapool.tech) - DECOUPLED 2026-10-17
+- /opt/lpu-nights is now an INDEPENDENT app: own server tree, own .env, own deploy-gate.sh (SITE=lpu-nights).
 - pm2 app: lpu-nights; DB + photos under /var/lib/lpu-nights
-- Every code change ships to BOTH /opt/dandiya-nights and /opt/lpu-nights, then pm2 restart both
+- Rule (Deepanshu, 2026-10-17): a change to one app must never affect the other. No mirror rule, no joint restarts.
 
 ---
 
