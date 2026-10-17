@@ -584,7 +584,7 @@ class LiveApi {
       });
     } catch (e) { throw new Error('No internet. Check your connection and try again.'); }
     const json = await res.json().catch(() => ({}));
-    if (res.status === 401 && S.token) { S = Object.assign(freshState(), {ref: S.ref, entry: S.entry}); save(); setTimeout(() => go('landing'), 0); throw new Error('Please log in again.'); }
+    if (res.status === 401 && S.token) { S = Object.assign(freshState(), {ref: S.ref, entry: S.entry, phone: S.phone || '', loginOnly: true}); save(); setTimeout(() => go('phone'), 0); throw new Error('Please log in again.'); }
     if (!res.ok) { const err = new Error(json.message || 'Something went wrong. Try again.'); err.code = json.code; err.status = res.status; throw err; }
     return json;
   }
@@ -1005,6 +1005,7 @@ SCREENS.phone = () => {
     <p class="note">We’ll send a ${CONFIG.OTP_LENGTH}-digit code on WhatsApp.<br>Your number is never shown to anyone.</p>`,
     {right: n ? `<span class="quiet">${IC.heart(14)} ${plural(n, 'pick')} saved</span>` : ''});
   const ph = $('#ph'), nx = $('#nx'), err = $('#err');
+  if (S.phone) ph.value = fmtPhone(S.phone);
   const digits = () => ph.value.replace(/\D/g, '').replace(/^(91|0)(?=\d{10})/, '').slice(0, 10);
   ph.oninput = () => { const d = digits(); ph.value = fmtPhone(d); nx.disabled = d.length < 10; err.textContent = ''; };
   ph.oninput();
@@ -2260,7 +2261,7 @@ function blockedSheet() {
 (function(){
   function isWV(ua){
     ua = ua || navigator.userAgent || '';
-    if (/Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|MicroMessenger|Line\//i.test(ua)) return true;
+    if (/Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|MicroMessenger|Line\/|WhatsApp|Snapchat|musical_ly|TikTok|Twitter/i.test(ua)) return true;
     if (/; wv\)|WebView/i.test(ua)) return true;
     if (/iPhone|iPad|iPod/i.test(ua) && !/Safari/i.test(ua)) return true;
     if (/Android/i.test(ua) && /Version\/\d+\.\d+/i.test(ua) && !/Chrome\//i.test(ua)) return true;
