@@ -1909,7 +1909,7 @@ function photosSheet({first = false, then = null} = {}) {
     $('#psave', s).disabled = !n;
     $('#pcount', s).textContent = n >= CONFIG.MAX_PHOTOS ? `${n} of ${CONFIG.MAX_PHOTOS} photos. That’s the most you can add.` : `${n} of ${CONFIG.MAX_PHOTOS} photos${n ? '. Tap “Make main” to change the first one.' : ''}`;
     $('#pf', s).disabled = n >= CONFIG.MAX_PHOTOS;
-    $$('[data-rm]', s).forEach(b => b.onclick = e => { e.preventDefault(); photos.splice(+b.dataset.rm, 1); paint(s); });
+    $$('[data-rm]', s).forEach(b => b.onclick = async e => { e.preventDefault(); const i = +b.dataset.rm, gone = photos.splice(i, 1); paint(s); if (first) return; if (!photos.length) { $('#perr', s).textContent = 'Your pass needs at least one photo. Add one, then save.'; return; } try { const r = await api.saveProfile({...profilePayload(), photos}); S.profile = r.profile; photos = [...(r.profile.photos || [])]; save(); paint(s); toast('Photo removed'); } catch (x) { photos.splice(i, 0, ...gone); paint(s); $('#perr', s).textContent = x.message; toast(x.message || 'Could not remove photo. Try again.'); } });
     $$('[data-main]', s).forEach(b => b.onclick = () => { photos.unshift(...photos.splice(+b.dataset.main, 1)); paint(s); });
   };
   sheet(`<h2>${first ? 'Add your photo<em>so they can see you too.</em>' : 'Your photos'}</h2>
@@ -1943,7 +1943,7 @@ function photosSheet({first = false, then = null} = {}) {
       const had = !!myPhoto();
       try { const r = await api.saveProfile({...profilePayload(), photos}); S.profile = r.profile; save(); track('photos_done', {count: photos.length, first: !had}); closeSheet();
         toast(had ? 'Saved' : `${IC.check} Your pass is live. People can see you now.`); if (route === 'app') go('app'); if (then) then(); }
-      catch (e) { b.disabled = false; b.textContent = first ? 'Done' : 'Save photos'; $('#perr', s).textContent = e.message; }
+      catch (e) { b.disabled = false; b.textContent = first ? 'Done' : 'Save photos'; $('#perr', s).textContent = e.message; toast(e.message || 'Could not save photos. Try again.'); }
     };
   });
 }
@@ -2209,7 +2209,7 @@ async function syncPicapool(force) {
   else if (route === 'app' && tab === 'me' && !$('.sheet-bg', app)) renderMe();
   if (r.synced?.nameChanged && S.profile) toast(`Your name now matches your Picapool account: ${esc(S.user.firstName)}`);
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) syncPicapool(); });
+let hiddenAt = 0; document.addEventListener('visibilitychange', () => { if (document.hidden) { hiddenAt = Date.now(); return; } syncPicapool(); if (S.token && !isDemo() && hiddenAt && Date.now() - hiddenAt > 6e5) { hiddenAt = 0; feed.queue = []; if (route === 'app') renderFeed(); } });
 
 /* ---------------- boot ---------------- */
 document.addEventListener('keydown', e => {
