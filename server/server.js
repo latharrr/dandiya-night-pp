@@ -924,7 +924,7 @@ route('DELETE', '/api/profile', ({req}) => {
 });
 
 route('POST', '/api/events', ({req, body}) => {
-  const ev = clean(body.event, 40); if (!/^[a-z_]{2,40}$/.test(ev)) return null;
+  const ev = clean(body.event, 40); if (!/^[a-z0-9_]{2,40}$/.test(ev)) return null;
   const s = clean(body.sessionId, 40);
   const u = s ? q('SELECT id FROM users WHERE session_id=?').get(s) : null;
   q('INSERT INTO events(ts, event, user_id, session_id, ref, data) VALUES(?,?,?,?,?,?)')
@@ -1155,7 +1155,8 @@ function kvSet(k, obj) {
 }
 route('GET', '/api/admin/installly', ({ req, url }) => {
   admin(req, url);
-  return { link: 'picapool.installly.io/qi153a', data: kvGet('installly') };
+  const dlTracked = q(`SELECT COUNT(*) c FROM events WHERE event='pica10_click'`).get().c;
+  return { link: 'picapool.instally.io/qi153a', data: kvGet('installly'), tracked: dlTracked };
 });
 route('POST', '/api/admin/installly', ({ req, url, body }) => {
   admin(req, url);

@@ -97,8 +97,8 @@ async function load() {
     $('#nightManual').innerHTML = ns.manual ? `<div class="kpis">${k(ns.manual.total, 'hand-entered total (locked)') + k(fmtT(ns.manual.enteredAt), 'entered at')}</div>` : `<div class="row"><input id="nsManIn" type="number" min="0" placeholder="hand-entered total (sponsor-reported)"><button id="nsManBtn">Save once</button><span class="muted">one-time, locks after save; real figure stays above</span></div>`;
     const il = await api('/installly');
     const d = il.data || {};
-    $('#installly').innerHTML = il.data ? k(d.clicks, 'clicks') + k(d.installs, 'installs') + k(d.cvr, 'CVR') + k(fmtT(d.updatedAt), 'last updated') : k('-', 'no entry yet');
-    $('#installlyForm').innerHTML = `<div class="row"><input id="ilClicks" type="number" min="0" placeholder="clicks" value="${il.data ? d.clicks : ''}"><input id="ilInstalls" type="number" min="0" placeholder="installs" value="${il.data ? d.installs : ''}"><input id="ilCvr" placeholder="CVR e.g. 20%" value="${il.data ? esc(d.cvr) : ''}"><button id="ilBtn">Save</button><span class="muted">from Installly dashboard (picapool.installly.io/qi153a); saving updates values + timestamp; not part of app-tracked numbers</span></div>`;
+    $('#installly').innerHTML = (il.data ? k(d.clicks, 'clicks (Installly)') + k(d.installs, 'installs (Installly)') + k(d.cvr, 'CVR') + k(fmtT(d.updatedAt), 'last updated') : k('-', 'no Installly entry yet')) + k(il.tracked || 0, 'tracked by app (button clicks)');
+    $('#installlyForm').innerHTML = `<div class="row"><input id="ilClicks" type="number" min="0" placeholder="clicks" value="${il.data ? d.clicks : ''}"><input id="ilInstalls" type="number" min="0" placeholder="installs" value="${il.data ? d.installs : ''}"><input id="ilCvr" placeholder="CVR e.g. 20%" value="${il.data ? esc(d.cvr) : ''}"><button id="ilBtn">Save</button><span class="muted">from Installly dashboard (picapool.instally.io/qi153a); saving updates values + timestamp; not part of app-tracked numbers</span></div>`;
     await loadTop();
   } catch (e) { $('#err').textContent = e.message; }
 }
